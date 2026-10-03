@@ -112,9 +112,15 @@ class Handler(SimpleHTTPRequestHandler):
             room['seen'][role]=now
             active=ROLES[:room['settings']['players']]
             if action=='events':
+                # HTTP diagnostics work before the WebRTC channel opens.
+                if room['phase']=='loading' and 'boot_stage' in data:
+                    step=str(data.get('boot_step','0'))
+                    if step.isdigit() and 0<=int(step)<=7:
+                        room.setdefault('startup',{})[role]={'stage':str(data.get('boot_stage',''))[:300],'step':int(step),'seen':now}
                 events=room['queues'][role]
                 room['queues'][role]=[]
-                return self.reply({'events':events,'state':snapshot(room)})
+                startup={r:{'stage':v['stage'],'step':v['step'],'age':round(now-v['seen'],1)} for r,v in room.get('startup',{}).items()}
+                return self.reply({'events':events,'state':snapshot(room),'startup':startup})
             if action in ('seat','settings','ready'):
                 if room['phase']!='lobby':
                     return self.reply({'error':'本局已经锁定，请结束后重新建房'},409)

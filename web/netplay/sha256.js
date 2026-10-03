@@ -20,6 +20,9 @@ export async function sha256(bytes){
   const h=new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
   const w=new Uint32Array(64);
   for(let offset=0;offset<data.length;offset+=64){
+    // LAN HTTP lacks SubtleCrypto on many browsers. Yield between 64 KiB
+    // chunks so slow mobile hashing does not block signaling or the boot UI.
+    if(offset>0&&offset%65536===0)await new Promise(resolve=>setTimeout(resolve,0));
     for(let i=0;i<16;i++)w[i]=view.getUint32(offset+i*4);
     for(let i=16;i<64;i++){
       const a=w[i-15],b=w[i-2];

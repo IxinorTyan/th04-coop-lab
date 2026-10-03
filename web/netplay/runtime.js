@@ -42,16 +42,42 @@ document.getElementById('sound').onclick=async()=>{
 };
 async function get(path,type='json'){
   const response=await fetch(path,{cache:'no-store'});if(!response.ok)throw Error(`资源读取失败：${path}`);
+  if(type==='arrayBuffer'&&response.body){
+    const total=Number(response.headers.get('content-length'))||0,reader=response.body.getReader(),chunks=[];
+    let received=0,last=0;
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      chunks.push(value);received+=value.length;
+      if(performance.now()-last>200){
+        last=performance.now();
+        await bootProgress(`下载游戏磁盘：${(received/1048576).toFixed(2)} MiB${total?` / ${(total/1048576).toFixed(2)} MiB（${Math.min(100,Math.floor(received/total*100))}%）`:''}`,1);
+      }
+    }
+    const bytes=new Uint8Array(received);let at=0;
+    for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length;}
+    return bytes.buffer;
+  }
   return response[type]();
 }
+async function bootProgress(message,step){
+  details.textContent=`启动进度：${message}`;
+  window.parent.postMessage({protocol:'th04-rollback/2',event:'boot-progress',message,step},location.origin);
+  // Give the parent page a chance to display the stage before expensive work.
+  await new Promise(resolve=>setTimeout(resolve,0));
+}
 async function boot(config){
-  details.textContent='正在自动加载本机模拟器和游戏资源…';
+  await bootProgress('下载游戏磁盘与版本清单',1);
+  if(typeof WebAssembly==='undefined')throw Error('浏览器不支持 WebAssembly，请使用最新版 Chrome / Edge / Safari');
+  if(typeof DecompressionStream==='undefined')throw Error('浏览器缺少 gzip 解压支持，请更新浏览器');
   const [compressed,meta,manifest,version]=await Promise.all([
     get('../th04-coop.hdi.gz','arrayBuffer'),get('../disk.json'),get('../patch.json'),get('./runtime.json')]);
   patch=manifest;
+  await bootProgress('解压游戏磁盘',2);
   const disk=new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  await bootProgress('校验游戏磁盘（局域网 HTTP 下可能需要更长时间）',3);
   if(disk.length!==meta.size||await sha256(disk)!==meta.sha256)throw Error('游戏磁盘校验失败，请刷新页面');
   installConfig(disk,patch,encodeConfig(config));
+  await bootProgress('安装本局配置和声音补丁',4);
   // Apply the game's own BGM OFF / FM SE ON settings to this private copy.
   // Keep the original launcher, PMD driver, shared disk and single-player intact.
   const sound=soundPolicy=version.native_sound;
@@ -64,16 +90,19 @@ async function boot(config){
     }
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
+  await bootProgress('下载、编译并初始化 NP2 WASM 与音频设备',5);
   emulator=await NP21.create({canvas,lockstep:true,lockstepEpoch:version.epoch,
     clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
     onExit:()=>{enabled=false;closed=true;bgm?.dispose();window.parent.postMessage({protocol:'th04-rollback/2',event:'runtime-exit'},location.origin);}});
+  if(closed){emulator.pause();return;}
+  await bootProgress('挂载游戏磁盘',6);
   emulator.addDiskImage('th04-sync.hdi',disk);emulator.setHdd(0,'th04-sync.hdi');
   if(emulator.module.SDL2?.audioContext?.sampleRate!==44100)throw Error('此浏览器未提供统一的 44100 Hz 音频，请改用新版 Chrome 或 Edge');
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
-  details.textContent='启动进度：原游戏磁盘和引擎已就绪，等待全员同步开局。';
-  return {disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
+  await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
+  return {disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);

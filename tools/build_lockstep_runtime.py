@@ -81,6 +81,7 @@ manifest['native_snapshots_sha256']=hashlib.sha256((ROOT/'web/netplay/native-sna
 manifest['game_adapter_sha256']=hashlib.sha256((ROOT/'web/netplay/runtime.js').read_bytes()).hexdigest()
 manifest['room_sha256']=hashlib.sha256((ROOT/'web/netplay/room.js').read_bytes()).hexdigest()
 manifest['membership_sha256']=hashlib.sha256((ROOT/'web/netplay/membership.js').read_bytes()).hexdigest()
+manifest['startup_sha256']=hashlib.sha256((ROOT/'web/netplay/runtime.html').read_bytes()+(ROOT/'web/netplay/sha256.js').read_bytes()).hexdigest()
 manifest['controls_sha256']=hashlib.sha256((ROOT/'web/netplay/controls.js').read_bytes()).hexdigest()
 manifest['pause_sha256']=hashlib.sha256((ROOT/'web/netplay/pause.js').read_bytes()).hexdigest()
 manifest['native_sound']=native_sound_config(ROOT)

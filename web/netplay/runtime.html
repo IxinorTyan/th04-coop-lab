@@ -8,4 +8,25 @@
 <p>游戏内 BGM：关闭（0） · SE：开启（FM 音效）。浏览器音乐在游戏运行后加载。</p>
 <p><label>浏览器音乐音量 <input id="bgm-volume" type="range" min="0" max="100" value="70"></label></p>
 <pre id="details">等待房间统一开局…</pre>
-<script type="module" src="runtime.js"></script></html>
+<pre id="page-warning" hidden></pre>
+<script>
+// Global browser events can originate from extensions or injected scripts.
+// Only our explicit module/load/simulation failure paths may stop the session.
+(function(){
+  function warning(message,source,stack){
+    var text=String(message)+'\n来源：'+(source||'未提供')+'\n'+String(stack||'');
+    var panel=document.getElementById('page-warning');panel.hidden=false;
+    panel.textContent='页面异常记录（来源未确认，不自动结束游戏）：\n'+text;
+    window.parent.postMessage({protocol:'th04-rollback/2',event:'page-warning',message:text.slice(0,1500)},location.origin);
+  }
+  window.addEventListener('error',function(e){warning(e.message||'资源加载异常',e.filename||(e.target&&e.target.src),e.error&&e.error.stack);},true);
+  window.addEventListener('unhandledrejection',function(e){warning(e.reason&&e.reason.message||String(e.reason),'未处理的 Promise',e.reason&&e.reason.stack);});
+  window.th04RuntimeReady=import('./runtime.js').then(function(){return true;},function(error){
+    var message='游戏模块加载失败：'+String(error&&error.message||error);
+    document.getElementById('details').textContent=message;
+    window.parent.postMessage({protocol:'th04-rollback/2',event:'boot-error',message:message},location.origin);
+    return false;
+  });
+})();
+</script>
+</html>

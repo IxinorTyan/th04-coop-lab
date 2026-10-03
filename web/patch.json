@@ -1,24 +1,24 @@
 {
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
-  "patched_size": 166450,
+  "patched_size": 167266,
   "insert_image_offset": 78048,
-  "insert_size": 10192,
-  "payload_size": 10178,
-  "heap_bytes": 383536,
+  "insert_size": 11008,
+  "payload_size": 11006,
+  "heap_bytes": 382720,
   "payload_and_heap_bytes": 393728,
-  "payload_padding_bytes": 14,
-  "mailbox_cs_offset": 36976,
+  "payload_padding_bytes": 2,
+  "mailbox_cs_offset": 37804,
   "relocations_rebased": 1136,
-  "native_pause_cs_offset": 44155,
-  "offline_mask_cs_offset": 44280,
-  "loadout_cs_offset": 37665,
-  "loadout_file_offset": 87569,
-  "bomb_owner_cs_offset": 38146,
+  "native_pause_cs_offset": 44983,
+  "offline_mask_cs_offset": 45108,
+  "loadout_cs_offset": 38493,
+  "loadout_file_offset": 88397,
+  "bomb_owner_cs_offset": 38974,
   "entry_count": 57,
-  "rescue_cs_offset": 38355,
-  "p3_input_cs_offset": 42799,
-  "p3_motion_cs_offset": 42802,
+  "rescue_cs_offset": 39183,
+  "p3_input_cs_offset": 43627,
+  "p3_motion_cs_offset": 43630,
   "boss_damage_call_sites": [
     124409,
     111620,
@@ -71,31 +71,31 @@
     {
       "image_offset": 43934,
       "original": "9ac4060e13",
-      "target_cs_offset": 44293,
+      "target_cs_offset": 45121,
       "name": "offline seats before world update"
     },
     {
       "image_offset": 43950,
       "original": "e81e07",
-      "target_cs_offset": 44171,
+      "target_cs_offset": 44999,
       "name": "native pause entry"
     },
     {
       "image_offset": 45783,
       "original": "9abc060e13",
-      "target_cs_offset": 44192,
+      "target_cs_offset": 45020,
       "name": "pause release at entry"
     },
     {
       "image_offset": 45851,
       "original": "9a33010e13",
-      "target_cs_offset": 44213,
+      "target_cs_offset": 45041,
       "name": "pause synchronized menu input"
     },
     {
       "image_offset": 45991,
       "original": "9abc060e13",
-      "target_cs_offset": 44192,
+      "target_cs_offset": 45020,
       "name": "pause release at resume"
     },
     {
@@ -143,49 +143,49 @@
     {
       "image_offset": 44004,
       "original": "e8cf58",
-      "target_cs_offset": 37954,
+      "target_cs_offset": 38782,
       "name": "shared shots and independent lasers update"
     },
     {
       "image_offset": 44053,
       "original": "e83a59",
-      "target_cs_offset": 37998,
+      "target_cs_offset": 38826,
       "name": "shared shots and independent lasers render"
     },
     {
       "image_offset": 52065,
       "original": "e8e038",
-      "target_cs_offset": 38027,
+      "target_cs_offset": 38855,
       "name": "shared shots and independent lasers invalidate"
     },
     {
       "image_offset": 67332,
       "original": "660fb7c7",
-      "target_cs_offset": 38055,
+      "target_cs_offset": 38883,
       "name": "guest laser damage"
     },
     {
       "image_offset": 44944,
       "original": "e8a14f",
-      "target_cs_offset": 38149,
+      "target_cs_offset": 38977,
       "name": "preload both Bomb characters"
     },
     {
       "image_offset": 65530,
       "original": "c606684301",
-      "target_cs_offset": 38213,
+      "target_cs_offset": 39041,
       "name": "latch Bomb owner"
     },
     {
       "image_offset": 44039,
       "original": "e80056",
-      "target_cs_offset": 38257,
+      "target_cs_offset": 39085,
       "name": "render owner Bomb resources"
     }
   ],
-  "sha256": "79572cc5f19ec8eb61a7f87e9191de0fb35f92d75c8141a9a5ffe73135504f84",
+  "sha256": "709f44bd5372122abdc8114f7a72b1c13706a662bb25e1d261a2be3aa808beac",
   "code_segment": 2735,
-  "data_segment": 9137,
+  "data_segment": 9188,
   "launch_config": {
     "schema": 2,
     "defaults": [
@@ -203,17 +203,17 @@
     ],
     "targets": [
       [
-        8278545,
-        8278546,
-        8278547,
-        8278548,
-        8278549,
-        8278550,
-        8278551,
-        8278552,
-        8278553,
-        8278554,
-        8278555
+        8279373,
+        8279374,
+        8279375,
+        8279376,
+        8279377,
+        8279378,
+        8279379,
+        8279380,
+        8279381,
+        8279382,
+        8279383
       ],
       [
         326673,

@@ -866,22 +866,21 @@ hud_render:
     pushad
     push es
     call hud_graphics_clear
+    ; Build the complete text card off-screen. TRAM is not double-buffered:
+    ; clearing visible cells first exposes a blank card during every update.
+    push cs
+    pop es
+    cld
+    mov di,hud_cells
+    mov cx,8*22
+    mov ax,0x20
+    rep stosw
+    mov cx,8*22
+    mov ax,0x05
+    rep stosw
+    mov byte [cs:hud_buffered],1
     mov ax,0xa000
     mov es,ax
-    mov di,7*160+56*2
-    mov dx,8
-.clear_row:
-    mov cx,22
-.clear_cell:
-    mov word [es:di],0x20
-    ; The right side of graphics VRAM is TH04's tile cache. Opaque black
-    ; reverse spaces mask it; ordinary transparent spaces expose the cache.
-    mov word [es:di+0x2000],0x05
-    add di,2
-    loop .clear_cell
-    add di,160-44
-    dec dx
-    jnz .clear_row
     ; Boss HP occupies the former shared power rows 21/22; do not erase it.
     xor bp,bp
     mov bx,resources
@@ -953,6 +952,8 @@ hud_render:
     movzx ax,byte [cs:player_count]
     cmp bp,ax
     jb .player
+    mov byte [cs:hud_buffered],0
+    call hud_commit
     xor al,al
     out 0x7c,al
     pop es
@@ -1011,9 +1012,11 @@ hud_icon:
     call ORIGINAL(0xc546)
     pop es
     popad
-    mov word [es:di+0x2000],1
-    mov word [es:di+0x2002],1
-    add di,4
+    push ax
+    mov ax,0x0120
+    call hud_stage_cell
+    call hud_stage_cell
+    pop ax
     pop bp
     ret 2
 hud_text:
@@ -1026,6 +1029,17 @@ hud_text:
 .ret:
     ret
 hud_char:
+    cmp byte [cs:hud_buffered],0
+    je .direct
+    push ax
+    cmp al,' '
+    jne .stage
+    mov ah,0x05
+.stage:
+    call hud_stage_cell
+    pop ax
+    ret
+.direct:
     mov [es:di],al
     mov byte [es:di+1],0
     mov [es:di+0x2000],ah
@@ -1036,6 +1050,56 @@ hud_char:
     mov byte [es:di+0x2001],0
     add di,2
     ret
+
+; AX = character/attribute, DI = original TRAM coordinate. Preserve callers'
+; registers; icon cells deliberately use transparent spaces (attribute 1).
+hud_stage_cell:
+    pushad
+    mov bx,ax
+    mov ax,di
+    sub ax,7*160+56*2
+    xor dx,dx
+    mov cx,160
+    div cx
+    imul si,ax,44
+    add si,dx
+    movzx ax,bl
+    mov [cs:hud_cells+si],ax
+    movzx ax,bh
+    mov [cs:hud_attrs+si],ax
+    popad
+    add di,2
+    ret
+
+hud_commit:
+    pushad
+    xor si,si
+    mov di,7*160+56*2
+    mov dx,8
+.row:
+    mov cx,22
+.cell:
+    mov ax,[cs:hud_cells+si]
+    cmp [es:di],ax
+    je .attribute
+    mov [es:di],ax
+.attribute:
+    mov ax,[cs:hud_attrs+si]
+    cmp [es:di+0x2000],ax
+    je .next
+    mov [es:di+0x2000],ax
+.next:
+    add si,2
+    add di,2
+    loop .cell
+    add di,160-44
+    dec dx
+    jnz .row
+    popad
+    ret
+hud_buffered: db 0
+hud_cells: times 8*22 dw 0x20
+hud_attrs: times 8*22 dw 0x05
 hud_number:
     xor dx,dx
     mov cx,10
