@@ -1,7 +1,8 @@
 import {NP21} from '../vendor/np2/np2-wasm.js';
 import {encodeConfig,installConfig} from '../launch-config.js';
 import {sha256} from './sha256.js';
-import {mapping,keyboardBits} from './controls.js';
+import {isBound,keyboardBits} from './controls.js';
+import {useControlSnapshot,isFormTarget,controlsSummary} from '../control-settings.js';
 import {PauseMenu} from './pause.js';
 const canvas=document.getElementById('canvas'),details=document.getElementById('details');
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
@@ -12,16 +13,18 @@ let pendingMusic=[],lastMusicName='',musicSettings,musicReady=false;
 let pauseMenu,localSlot,menuAction=()=>{},blocked=[0,0],emulatedTicks=0,playerCount=2;
 const rollbackStates=new Map(),effects=new Map();
 let confirmedPrefix=0,replaying=false,currentEffect;
+let controlsBlocked=false;
 function localButtons(){
   return keyboardBits(keys);
 }
 function clearKeys(){keys.clear();inputListener(0);}
 window.addEventListener('keydown',event=>{
-  if(!mapping[event.code])return;
+  if(controlsBlocked||isFormTarget(event.target)||event.metaKey||!isBound(event.code))return;
   event.preventDefault();event.stopImmediatePropagation();keys.add(event.code);inputListener(localButtons());
 },true);
 window.addEventListener('keyup',event=>{keys.delete(event.code);inputListener(localButtons());},true);
 window.addEventListener('blur',clearKeys);
+document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearKeys();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();emulator?.module.netFlushAudio?.();}});
 canvas.addEventListener('pointerdown',()=>canvas.focus());
 function nativePauseAddress(){
@@ -265,6 +268,7 @@ function checksum(){
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:v.getUint32(mailbox+16,true)};
 }
 window.th04Sync={
+  updateControls(value,editing=false){clearKeys();useControlSnapshot(value);controlsBlocked=editing;document.getElementById('controls-summary').textContent=controlsSummary('online');},
   configure(host,local,players=2){
     if(![2,3].includes(players)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<players))throw Error('无效暂停菜单座位');
     playerCount=players;blocked=Array(players).fill(0);pauseMenu=new PauseMenu(host,players);localSlot=local;

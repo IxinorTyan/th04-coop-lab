@@ -1,23 +1,57 @@
 import {NP21} from './vendor/np2/np2-wasm.js';
 import {encodeConfig,installConfig} from './launch-config.js';
+import {mountControlSettings,keyboardBits,padBits,isBound,isFormTarget,controlsSummary,syntheticInputEvents} from './control-settings.js';
 const $=id=>document.getElementById(id);
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
 let emulator, mailbox=-1, candidates=[], lastScan=0, lastTick=-1, lastTickAt=0;
-let keyboard=new Set(), testInput=null, testing=false, padStart=false, pageFocused=true;
+let keyboard=new Set(), testInput=null, testing=false, padMenu=0, pageFocused=true,oldP1=0;
 let launchSettings=null, launchStarted=0, stageAnnounced=false;
-const p2Keys=new Set(['KeyW','KeyA','KeyS','KeyD','KeyJ','KeyK','KeyL']);
+const syntheticKeys=syntheticInputEvents;
+const nativeActions=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyX',16],['KeyZ',32],['ShiftLeft',64],['Escape',128],['Enter',256]];
 const status=text=>{$('status').textContent=text;};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function nativeKey(code,down){
-  const keyCodes={KeyZ:90,KeyX:88,ArrowUp:38,ArrowDown:40,ArrowLeft:37,ArrowRight:39,Escape:27,ShiftLeft:16};
+  if(!emulator)return;
+  const keyCodes={KeyZ:90,KeyX:88,ArrowUp:38,ArrowDown:40,ArrowLeft:37,ArrowRight:39,Escape:27,ShiftLeft:16,Enter:13};
   const key={KeyZ:'z',KeyX:'x',ShiftLeft:'Shift'}[code]||code;
-  $('canvas').dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code,key,keyCode:keyCodes[code],which:keyCodes[code],bubbles:true}));
+  const event=new KeyboardEvent(down?'keydown':'keyup',{code,key,keyCode:keyCodes[code],which:keyCodes[code],bubbles:true});
+  syntheticKeys.add(event);$('canvas').dispatchEvent(event);
 }
 async function tap(code){nativeKey(code,true);await sleep(110);nativeKey(code,false);$('canvas').focus();}
 for(const button of document.querySelectorAll('[data-key]'))button.onclick=()=>tap(button.dataset.key);
-document.addEventListener('keydown',e=>{if(p2Keys.has(e.code)){e.preventDefault();e.stopImmediatePropagation();keyboard.add(e.code);}},true);
-document.addEventListener('keyup',e=>{if(p2Keys.has(e.code)){e.preventDefault();e.stopImmediatePropagation();keyboard.delete(e.code);}},true);
-function release(){keyboard.clear();if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
+function syncP1(){
+  let bits=keyboardBits(keyboard,'local1');
+  if((bits&3)===3)bits&=~3;if((bits&12)===12)bits&=~12;
+  for(const [code,bit]of nativeActions)if((bits&bit)!==(oldP1&bit))nativeKey(code,!!(bits&bit));
+  oldP1=bits;
+}
+function release(){keyboard.clear();syncP1();padMenu=0;if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
+function showControls(){
+  $('controls-summary').textContent=`P1：${controlsSummary('local1')}。 P2：${controlsSummary('local2')}。`;
+}
+const controlEditor=mountControlSettings($('control-settings'),{local:true,onEditing:()=>release(),onChange:()=>{release();showControls();}});
+showControls();
+window.addEventListener('keydown',e=>{
+  if(syntheticKeys.has(e))return;
+  // SDL must only see translated events, including while a form has focus.
+  e.stopImmediatePropagation();
+  if(controlEditor.isEditing()||isFormTarget(e.target)||!emulator||e.metaKey)return;
+  const bound=isBound(e.code,'local1')||isBound(e.code,'local2');
+  // Do not let old physical Z/X/arrows also reach SDL after being rebound.
+  if(bound||e.target===$('canvas')){
+    if(bound||nativeActions.some(([code])=>code===e.code)||e.code==='ShiftRight'||e.code==='Space')e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+  if(bound){keyboard.add(e.code);syncP1();}
+},true);
+window.addEventListener('keyup',e=>{
+  if(syntheticKeys.has(e))return;
+  e.stopImmediatePropagation();
+  const held=keyboard.delete(e.code);
+  if(held||e.target===$('canvas')){e.preventDefault();e.stopImmediatePropagation();syncP1();}
+},true);
+window.addEventListener('keypress',e=>{if(!syntheticKeys.has(e)){e.stopImmediatePropagation();if(e.target===$('canvas'))e.preventDefault();}},true);
+document.addEventListener('focusin',e=>{if(isFormTarget(e.target))release();});
 window.addEventListener('blur',()=>{pageFocused=false;release();});
 window.addEventListener('focus',()=>{pageFocused=true;});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
@@ -60,17 +94,18 @@ function snapshot(){
     p2Inv:heap[m+66],p2Miss:heap[m+72],input:v.getUint16(m+22,true)};
 }
 function gamepadInput(){
-  const all=Array.from(navigator.getGamepads?.()||[]).filter(Boolean);
+  let all=[];
+  try{all=Array.from(navigator.getGamepads?.()||[]).filter(p=>p?.connected);}catch{}
   const select=$('pad-select'),known=new Set([...select.options].map(o=>o.value));
   for(const pad of all)if(!known.has(String(pad.index))){const o=document.createElement('option');o.value=pad.index;o.textContent=`${pad.index+1} · ${pad.id}`;select.append(o);}
   const pad=select.value==='auto'?all[0]:all.find(p=>String(p.index)===select.value);
   $('pad').textContent=pad?`${pad.id}${pad.mapping==='standard'?'':'（非标准映射，请核对按钮）'}`:'未检测到手柄：连接后按一下手柄按钮。';
-  if(!pad)return {bits:0,focus:0};
-  const b=n=>pad.buttons[n]?.pressed;
-  if(b(9)&&!padStart&&pageFocused)tap('Escape');
-  padStart=!!b(9);
-  const x=pad.axes[0]||0,y=pad.axes[1]||0;
-  return {bits:(y<-.25||b(12)?1:0)|(y>.25||b(13)?2:0)|(x<-.25||b(14)?4:0)|(x>.25||b(15)?8:0)|(b(1)?16:0)|(b(0)?32:0),focus:b(5)?1:0};
+  if(!pageFocused||document.hidden||controlEditor.isEditing()){padMenu=0;return {bits:0,focus:0};}
+  const value=padBits(pad,'local2',.25)|keyboardBits(keyboard,'local2');
+  if(value&128&&!(padMenu&128))tap('Escape');
+  if(value&256&&!(padMenu&256))tap('Enter');
+  padMenu=value&(128|256);
+  return {bits:value&63,focus:value&64?1:0};
 }
 function tick(now){
   try{
@@ -82,8 +117,8 @@ function tick(now){
         if(!stageAnnounced){stageAnnounced=true;status(`已进入关卡 · P1 ${$('loadout-p1').selectedOptions[0].textContent} / P2 ${$('loadout-p2').selectedOptions[0].textContent}`);}
         if(s.ticks!==lastTick){lastTick=s.ticks;lastTickAt=now;}
         const live=now-lastTickAt<1200&&emulator.state==='running';
-        let bits=pad.bits|(keyboard.has('KeyW')?1:0)|(keyboard.has('KeyS')?2:0)|(keyboard.has('KeyA')?4:0)|(keyboard.has('KeyD')?8:0)|(keyboard.has('KeyJ')?32:0)|(keyboard.has('KeyL')?16:0);
-        let focus=pad.focus||keyboard.has('KeyK')?1:0;
+        let bits=pad.bits;
+        let focus=pad.focus;
         if(testInput){bits=testInput.bits;focus=testInput.focus||0;}
         if(!pageFocused||document.hidden||!live){bits=0;focus=0;}
         if((bits&3)===3)bits&=~3;if((bits&12)===12)bits&=~12;

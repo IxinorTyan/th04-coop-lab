@@ -1,5 +1,6 @@
 import {PROTOCOL,RollbackQueue,TICK_MS,MAX_ROLLBACK} from './rollback-queue.js';
-import {mapping,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
+import {isBound,keyboardBits,gamepadBits,gamepadStatus,normalize} from './controls.js';
+import {mountControlSettings,controlSnapshot,isFormTarget} from '../control-settings.js';
 import {mergeDeparture} from './membership.js';
 const $=id=>document.getElementById(id),roles=['host','guest','guest2'];
 const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
@@ -428,6 +429,7 @@ async function beginGame(){
   if(stopped)return;
   runtime=iframe.contentWindow.th04Sync;if(!runtime)throw Error('游戏模块没有就绪');
   runtime.configure(state.slots.host,state.slots[session.role],state.settings.players);
+  runtime.updateControls(controlSnapshot(),controlEditor.isEditing());
   runtime.onInput(value=>{childBits=value;});runtime.onMenuAction(value=>{pendingAction|=value;wake();});
   localReady=await runtime.load({...state.settings});if(stopped){runtime.stop();return;}
   for(const peer of peers.values())if(peer.channel?.readyState==='open')send(peer,{type:'ready',build:localReady});maybeRun();
@@ -511,7 +513,7 @@ function pump(now){
       updateMetrics(performance.now(),waiting);wake(waiting?16:0);return;
     }
     while(accumulator>=TICK_MS&&count<4&&(count===0||performance.now()-budgetStart<6)){
-      const value=normalize(keyboardBits(keys)|childBits|gamepadBits());if(value!==bits){bits=value;inputChangedAt=performance.now();}
+      const value=controlEditor.isEditing()?0:normalize(keyboardBits(keys)|childBits|gamepadBits());if(value!==bits){bits=value;inputChangedAt=performance.now();}
       const captured=queue.capture(bits|pendingAction);
       if(captured){pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);}
       const pair=queue.peek(runtime.canPredict());if(!pair){waiting=true;break;}
@@ -530,7 +532,12 @@ function pump(now){
     wake(waiting?16:Math.max(0,TICK_MS-accumulator-(after-lastNow)));
   }catch(error){fail(error);}finally{pumping=false;}
 }
-window.addEventListener('keydown',event=>{if(!running||!mapping[event.code])return;event.preventDefault();keys.add(event.code);});
+const controlEditor=mountControlSettings($('control-settings'),{
+  onChange:value=>{clearInput();runtime?.updateControls(value,controlEditor.isEditing());},
+  onEditing:editing=>{clearInput();runtime?.updateControls(controlSnapshot(),editing);}
+});
+window.addEventListener('keydown',event=>{if(!running||controlEditor.isEditing()||isFormTarget(event.target)||event.metaKey||!isBound(event.code))return;event.preventDefault();keys.add(event.code);});
+document.addEventListener('focusin',event=>{if(isFormTarget(event.target))clearInput();});
 window.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',clearInput);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();else wake();});
 window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===iframe?.contentWindow&&event.data?.protocol===PROTOCOL&&event.data?.event==='runtime-exit')fail(Error('游戏模拟器已经退出'));});

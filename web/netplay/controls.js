@@ -1,12 +1,9 @@
 // Each browser owns one seat. Physical devices never address P1/P2 directly.
-export const mapping={ArrowUp:1,ArrowDown:2,ArrowLeft:4,ArrowRight:8,KeyX:16,KeyZ:32,ShiftLeft:64,ShiftRight:64,Escape:128,Enter:256};
+import {padBits} from '../control-settings.js';
+export {keyboardBits,isBound} from '../control-settings.js';
 export function normalize(bits){
   if((bits&3)===3)bits&=~3;
   if((bits&12)===12)bits&=~12;
-  return bits;
-}
-export function keyboardBits(keys){
-  let bits=0;for(const code of keys)bits|=mapping[code]||0;
   return bits;
 }
 export let gamepadStatus='手柄：连接后按一下按钮';
@@ -21,9 +18,5 @@ export function gamepadBits(){
   const pad=pads.find(p=>p.mapping==='standard');
   if(!pad){gamepadStatus=pads.length?'手柄未提供标准映射，请切换至 XInput 模式':'未检测到手柄：连接后按一下按钮';return 0;}
   gamepadStatus=`手柄：${pad.id}`;
-  const down=i=>!!pad.buttons[i]?.pressed;
-  const x=pad.axes[0]||0,y=pad.axes[1]||0,deadzone=0.3;
-  return ((down(12)||y < -deadzone)?1:0)|((down(13)||y > deadzone)?2:0)
-    |((down(14)||x < -deadzone)?4:0)|((down(15)||x > deadzone)?8:0)
-    |(down(1)?16:0)|(down(0)?32:0)|(down(5)?64:0)|(down(9)?128:0);
+  return padBits(pad);
 }

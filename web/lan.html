@@ -1,5 +1,6 @@
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>东方幻想乡 · 输入同步联机</title>
+<link rel="stylesheet" href="control-settings.css">
 <style>
 :root{color-scheme:dark;font:16px system-ui,"Microsoft YaHei",sans-serif;background:#11141b;color:#e5e9f2}body{max-width:1100px;margin:24px auto;padding:0 20px}h1{font-size:25px}p{line-height:1.7;color:#b9c4d5}button,input,select{font:inherit;padding:9px 13px;border:1px solid #45516c;border-radius:7px;background:#252e40;color:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}.row{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;align-items:center}#status{padding:14px;background:#1c2837;line-height:1.7}fieldset{border:1px solid #354462;border-radius:8px}iframe{width:100%;height:800px;border:0;margin-top:20px}small,pre{color:#9badc8}pre{white-space:pre-wrap}a{color:#9ddaff}[hidden]{display:none!important}
 </style>
@@ -7,6 +8,7 @@
 <p>每台电脑的浏览器各自运行游戏，联网同步双方操作。打开网页后会自动加载资源，无需手动复制游戏文件。</p>
 <div class="row" id="entry"><button id="create">创建房间</button><input id="room" maxlength="6" placeholder="六位房间码" aria-label="房间码"><button id="join">加入房间</button></div>
 <div id="status" role="status">请先启动新版 start-lan.bat。此版本使用 9866 端口。</div>
+<div id="control-settings" class="row"></div>
 <section id="lobby" hidden>
 <p id="room-info"></p>
 <div class="row"><button id="seat0">选择 P1</button><button id="seat1">选择 P2</button><button id="seat2" hidden>选择 P3</button><span id="seats"></span></div>
