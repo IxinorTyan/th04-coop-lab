@@ -1,0 +1,233 @@
+{
+  "original_md5": "06d74719b6f72b11014a392fd34d5f57",
+  "original_size": 156258,
+  "patched_size": 166450,
+  "insert_image_offset": 78048,
+  "insert_size": 10192,
+  "payload_size": 10178,
+  "heap_bytes": 383536,
+  "payload_and_heap_bytes": 393728,
+  "payload_padding_bytes": 14,
+  "mailbox_cs_offset": 36976,
+  "relocations_rebased": 1136,
+  "native_pause_cs_offset": 44155,
+  "offline_mask_cs_offset": 44280,
+  "loadout_cs_offset": 37665,
+  "loadout_file_offset": 87569,
+  "bomb_owner_cs_offset": 38146,
+  "entry_count": 57,
+  "rescue_cs_offset": 38355,
+  "p3_input_cs_offset": 42799,
+  "p3_motion_cs_offset": 42802,
+  "boss_damage_call_sites": [
+    124409,
+    111620,
+    82539,
+    124468
+  ],
+  "boss_resistance_hook": 96735,
+  "effective_boss_hp": {
+    "2_players": 1.5,
+    "3_players": 2.2,
+    "method": "fractional damage scaling"
+  },
+  "aim_call_sites": [
+    82699,
+    85091,
+    85173,
+    86170,
+    86429,
+    87489,
+    90919,
+    94440,
+    99322,
+    104260,
+    106925,
+    113144,
+    113748,
+    114331,
+    114638,
+    114914,
+    116590,
+    119197,
+    122543,
+    126276,
+    127096,
+    129834,
+    130619,
+    130950
+  ],
+  "added_relocations": 12,
+  "resource_schema": {
+    "offset": 609,
+    "stride": 16,
+    "capacity": 4,
+    "players": 2,
+    "power_max": 128,
+    "lives_include_current": true,
+    "players_max": 3
+  },
+  "hooks": [
+    {
+      "image_offset": 43934,
+      "original": "9ac4060e13",
+      "target_cs_offset": 44293,
+      "name": "offline seats before world update"
+    },
+    {
+      "image_offset": 43950,
+      "original": "e81e07",
+      "target_cs_offset": 44171,
+      "name": "native pause entry"
+    },
+    {
+      "image_offset": 45783,
+      "original": "9abc060e13",
+      "target_cs_offset": 44192,
+      "name": "pause release at entry"
+    },
+    {
+      "image_offset": 45851,
+      "original": "9a33010e13",
+      "target_cs_offset": 44213,
+      "name": "pause synchronized menu input"
+    },
+    {
+      "image_offset": 45991,
+      "original": "9abc060e13",
+      "target_cs_offset": 44192,
+      "name": "pause release at resume"
+    },
+    {
+      "image_offset": 44918,
+      "original": "e85702",
+      "target_cs_offset": 34402,
+      "name": "stage init"
+    },
+    {
+      "image_offset": 44001,
+      "original": "e8db5e",
+      "target_cs_offset": 34712,
+      "name": "player update"
+    },
+    {
+      "image_offset": 44056,
+      "original": "e8e25f",
+      "target_cs_offset": 34992,
+      "name": "player render"
+    },
+    {
+      "image_offset": 52062,
+      "original": "e8813c",
+      "target_cs_offset": 34969,
+      "name": "background invalidation"
+    },
+    {
+      "image_offset": 68528,
+      "original": "ff169a44",
+      "target_cs_offset": 34883,
+      "name": "shot dispatch"
+    },
+    {
+      "image_offset": 68279,
+      "original": "e887da",
+      "target_cs_offset": 36234,
+      "name": "last life / retirement"
+    },
+    {
+      "image_offset": 61041,
+      "original": "c41e86ba26807f0b63772726fe470b",
+      "target_cs_offset": 36441,
+      "name": "score extend for survivors"
+    },
+    {
+      "image_offset": 44004,
+      "original": "e8cf58",
+      "target_cs_offset": 37954,
+      "name": "shared shots and independent lasers update"
+    },
+    {
+      "image_offset": 44053,
+      "original": "e83a59",
+      "target_cs_offset": 37998,
+      "name": "shared shots and independent lasers render"
+    },
+    {
+      "image_offset": 52065,
+      "original": "e8e038",
+      "target_cs_offset": 38027,
+      "name": "shared shots and independent lasers invalidate"
+    },
+    {
+      "image_offset": 67332,
+      "original": "660fb7c7",
+      "target_cs_offset": 38055,
+      "name": "guest laser damage"
+    },
+    {
+      "image_offset": 44944,
+      "original": "e8a14f",
+      "target_cs_offset": 38149,
+      "name": "preload both Bomb characters"
+    },
+    {
+      "image_offset": 65530,
+      "original": "c606684301",
+      "target_cs_offset": 38213,
+      "name": "latch Bomb owner"
+    },
+    {
+      "image_offset": 44039,
+      "original": "e80056",
+      "target_cs_offset": 38257,
+      "name": "render owner Bomb resources"
+    }
+  ],
+  "sha256": "79572cc5f19ec8eb61a7f87e9191de0fb35f92d75c8141a9a5ffe73135504f84",
+  "code_segment": 2735,
+  "data_segment": 9137,
+  "launch_config": {
+    "schema": 2,
+    "defaults": [
+      2,
+      1,
+      3,
+      2,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      2
+    ],
+    "targets": [
+      [
+        8278545,
+        8278546,
+        8278547,
+        8278548,
+        8278549,
+        8278550,
+        8278551,
+        8278552,
+        8278553,
+        8278554,
+        8278555
+      ],
+      [
+        326673,
+        326674,
+        326675,
+        326676,
+        326677,
+        326678,
+        326679,
+        326680,
+        326681,
+        326682,
+        326683
+      ]
+    ]
+  }
+}

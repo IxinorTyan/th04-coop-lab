@@ -1,0 +1,135 @@
+{
+  "protocol": "th04-rollback/2",
+  "adapter": "np21-rollback-v2",
+  "tick_hz": 60,
+  "audio_hz": 44100,
+  "epoch": 946684800000,
+  "source_js_sha256": "c7b832ff4c21b6a5b42db1e205aeef6b3e20f8d9514029d4360399a95effbfda",
+  "wasm_sha256": "3a2da4f9ffe9fca0b51ed1e4fd8814114a3bd83bee77e5965428d83b7bf66ea4",
+  "rollback_wasm": {
+    "source_sha256": "d64bbe39549a48686b1ed04fbadec68d8b33643d220395a9c09b8d54834f36e4",
+    "sha256": "3a2da4f9ffe9fca0b51ed1e4fd8814114a3bd83bee77e5965428d83b7bf66ea4",
+    "memory_bytes": 21495808,
+    "globals": 2,
+    "table_entries": 2244
+  },
+  "generated_js_sha256": "a5944ab359ccb13f5b2f21cb7907407ae4f981fbf0e35224696bcf4e10a2996c",
+  "clock_sha256": "4c66ee76a3e5c6e96c31279842cc7a25e490bcf2856bd854ec6dafbeeb916705",
+  "audio_output_sha256": "18760a612db5dfff8a8dd63bef48f12df51c62474a7cd465084ffbe0fc90a214",
+  "rollback_queue_sha256": "f655850cdb0ae47b36d94bdefb663ad45ef99bf179089bb189f80044062f306e",
+  "native_snapshots_sha256": "3395a06775ea4b3553492ad32a7a42bf723b9fd73c94f5c25a479f8c5147ac32",
+  "game_adapter_sha256": "41dd6eb976e656ed9fe82b0f9cb2e3d15f8f9cc5e2f7e4e9804b0c784daa5f25",
+  "room_sha256": "45db3dbaae42a90d9a825cabae18c2507c766bbe0ef1e8d38203466c2acfb44e",
+  "membership_sha256": "f1e2360aa7bfac3f057d4a4b7416e4e5155c6f0252d9cf4f01858e03f25b4a9a",
+  "controls_sha256": "a666b9b06cd9fcb2d69c14724b98bd747b8d43aa1e7a2e930f2c2fabfa804fad",
+  "pause_sha256": "92977ae14ace41e7d47a27a565cd9786fa71b236e97fe510b33bd7ae1a44ccb3",
+  "native_sound": {
+    "disk_sha256": "42fe2425e99cc3c3224d4d6339abdbfb7d4b749b1b9401ed0f755e8de5e10357",
+    "bgm": 0,
+    "se": 1,
+    "schema": 2,
+    "edits": [
+      {
+        "targets": [
+          12205059,
+          12205060,
+          12205065
+        ],
+        "expected": [
+          2,
+          1,
+          11
+        ],
+        "values": [
+          0,
+          1,
+          9
+        ]
+      },
+      {
+        "targets": [
+          8286127,
+          8286128,
+          8286129,
+          8286130,
+          8286131,
+          8286132,
+          8286133,
+          8286134,
+          8286135,
+          8286136,
+          8286137,
+          8286138,
+          8286139,
+          8286140,
+          8286141,
+          8286142,
+          8286143,
+          8286144,
+          8286145,
+          8286146,
+          8286147,
+          8286148,
+          8286149
+        ],
+        "expected": [
+          128,
+          62,
+          245,
+          8,
+          0,
+          116,
+          16,
+          139,
+          70,
+          6,
+          128,
+          62,
+          245,
+          8,
+          3,
+          116,
+          4,
+          205,
+          96,
+          235,
+          2,
+          205,
+          97
+        ],
+        "values": [
+          80,
+          139,
+          70,
+          6,
+          128,
+          252,
+          2,
+          118,
+          5,
+          128,
+          252,
+          25,
+          117,
+          7,
+          163,
+          250,
+          8,
+          255,
+          6,
+          248,
+          8,
+          88,
+          144
+        ]
+      }
+    ],
+    "observer": {
+      "bgm_mode": 2293,
+      "se_mode": 2292,
+      "filename": 14692,
+      "sequence": 2296,
+      "command": 2298
+    }
+  }
+}

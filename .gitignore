@@ -1,0 +1,47 @@
+# Local build products, backups, extracted originals and reference checkouts.
+/build/
+/baseline/
+/extracted/
+/reference/
+/vendor-source/
+
+# start-lan.bat runs this builder and its two local imports at startup.
+# Keep these even when distributing the already-built game.
+/tools/*
+!/tools/build_lockstep_runtime.py
+!/tools/build_rollback_wasm.py
+!/tools/lan_sound_config.py
+
+# Generated research inventories, memory dumps and old build reports.
+# Keep Markdown development notes for future maintainers.
+/reports/*
+!/reports/*.md
+
+# Retired TSR music disk and retired transport implementation.
+/web/th04-local-music.hdi.gz
+/web/local-music-disk.json
+/web/local-music-patch.json
+/web/netplay/frame-queue.js
+/web/netplay/input-wire.js
+
+# Interpreter/editor/system caches and local configuration.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+.env
+.env.*
+!.env.example
+
+# Intentionally keep web/vendor (including licenses), web/bgm, the playable
+# web/th04-coop.hdi.gz, web JSON manifests, patch sources/assets and docs.
+# These generated web artifacts are the runnable distribution, not build trash.

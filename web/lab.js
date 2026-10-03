@@ -1,0 +1,189 @@
+import {NP21} from './vendor/np2/np2-wasm.js';
+import {encodeConfig,installConfig} from './launch-config.js';
+const $=id=>document.getElementById(id);
+const signature=new TextEncoder().encode('TH04COOPLABv001!');
+let emulator, mailbox=-1, candidates=[], lastScan=0, lastTick=-1, lastTickAt=0;
+let keyboard=new Set(), testInput=null, testing=false, padStart=false, pageFocused=true;
+let launchSettings=null, launchStarted=0, stageAnnounced=false;
+const p2Keys=new Set(['KeyW','KeyA','KeyS','KeyD','KeyJ','KeyK','KeyL']);
+const status=text=>{$('status').textContent=text;};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function nativeKey(code,down){
+  const keyCodes={KeyZ:90,KeyX:88,ArrowUp:38,ArrowDown:40,ArrowLeft:37,ArrowRight:39,Escape:27,ShiftLeft:16};
+  const key={KeyZ:'z',KeyX:'x',ShiftLeft:'Shift'}[code]||code;
+  $('canvas').dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code,key,keyCode:keyCodes[code],which:keyCodes[code],bubbles:true}));
+}
+async function tap(code){nativeKey(code,true);await sleep(110);nativeKey(code,false);$('canvas').focus();}
+for(const button of document.querySelectorAll('[data-key]'))button.onclick=()=>tap(button.dataset.key);
+document.addEventListener('keydown',e=>{if(p2Keys.has(e.code)){e.preventDefault();e.stopImmediatePropagation();keyboard.add(e.code);}},true);
+document.addEventListener('keyup',e=>{if(p2Keys.has(e.code)){e.preventDefault();e.stopImmediatePropagation();keyboard.delete(e.code);}},true);
+function release(){keyboard.clear();if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
+window.addEventListener('blur',()=>{pageFocused=false;release();});
+window.addEventListener('focus',()=>{pageFocused=true;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
+$('canvas').addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
+$('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();});
+
+function scan(now){
+  const heap=emulator.module.HEAPU8;
+  if(now-lastScan<1000)return;
+  lastScan=now;
+  candidates=[];
+  for(let at=heap.indexOf(signature[0]);at>=0;at=heap.indexOf(signature[0],at+1)){
+    if(at+675>=heap.length)continue;
+    if(signature.every((v,i)=>heap[at+i]===v))candidates.push(at);
+  }
+  const v=new DataView(heap.buffer);
+  const active=candidates.filter(at=>v.getUint32(at+16,true)>0&&v.getUint16(at+20,true)>0&&heap[at+25]===1);
+  if(active.length===1)mailbox=active[0];
+  else if(!active.includes(mailbox))mailbox=-1;
+}
+function snapshot(){
+  if(!emulator||mailbox<0)return null;
+  const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer),m=mailbox;
+  const players=[];
+  if(heap[m+605]===1){
+    const count=Math.min(heap[m+606],heap[m+607]),stride=heap[m+608];
+    for(let id=0;id<count;id++){
+      const at=m+609+id*stride;
+      players.push({id:id+1,power:heap[at],level:heap[at+1],
+        lives:Math.max(0,heap[at+4]-1),bombs:heap[at+5],out:!!heap[at+6]});
+    }
+  }
+  return {ticks:v.getUint32(m+16,true),ds:v.getUint16(m+20,true),stage:v.getUint16(m+26,true),
+    players,
+    shots:v.getUint32(m+28,true),hits:v.getUint32(m+32,true),shotHits:v.getUint32(m+85,true),
+    items:v.getUint32(m+597,true),targets:v.getUint32(m+601,true),
+    p1:[v.getInt16(m+36,true)/16,v.getInt16(m+38,true)/16],
+    p2:[v.getInt16(m+46,true)/16,v.getInt16(m+48,true)/16],
+    stageFrame:v.getUint16(m+40,true),p1Miss:heap[m+42],p1Inv:heap[m+43],
+    p2Inv:heap[m+66],p2Miss:heap[m+72],input:v.getUint16(m+22,true)};
+}
+function gamepadInput(){
+  const all=Array.from(navigator.getGamepads?.()||[]).filter(Boolean);
+  const select=$('pad-select'),known=new Set([...select.options].map(o=>o.value));
+  for(const pad of all)if(!known.has(String(pad.index))){const o=document.createElement('option');o.value=pad.index;o.textContent=`${pad.index+1} · ${pad.id}`;select.append(o);}
+  const pad=select.value==='auto'?all[0]:all.find(p=>String(p.index)===select.value);
+  $('pad').textContent=pad?`${pad.id}${pad.mapping==='standard'?'':'（非标准映射，请核对按钮）'}`:'未检测到手柄：连接后按一下手柄按钮。';
+  if(!pad)return {bits:0,focus:0};
+  const b=n=>pad.buttons[n]?.pressed;
+  if(b(9)&&!padStart&&pageFocused)tap('Escape');
+  padStart=!!b(9);
+  const x=pad.axes[0]||0,y=pad.axes[1]||0;
+  return {bits:(y<-.25||b(12)?1:0)|(y>.25||b(13)?2:0)|(x<-.25||b(14)?4:0)|(x>.25||b(15)?8:0)|(b(1)?16:0)|(b(0)?32:0),focus:b(5)?1:0};
+}
+function tick(now){
+  try{
+    const pad=gamepadInput();
+    if(emulator){
+      scan(now);
+      let s=snapshot();
+      if(s){
+        if(!stageAnnounced){stageAnnounced=true;status(`已进入关卡 · P1 ${$('loadout-p1').selectedOptions[0].textContent} / P2 ${$('loadout-p2').selectedOptions[0].textContent}`);}
+        if(s.ticks!==lastTick){lastTick=s.ticks;lastTickAt=now;}
+        const live=now-lastTickAt<1200&&emulator.state==='running';
+        let bits=pad.bits|(keyboard.has('KeyW')?1:0)|(keyboard.has('KeyS')?2:0)|(keyboard.has('KeyA')?4:0)|(keyboard.has('KeyD')?8:0)|(keyboard.has('KeyJ')?32:0)|(keyboard.has('KeyL')?16:0);
+        let focus=pad.focus||keyboard.has('KeyK')?1:0;
+        if(testInput){bits=testInput.bits;focus=testInput.focus||0;}
+        if(!pageFocused||document.hidden||!live){bits=0;focus=0;}
+        if((bits&3)===3)bits&=~3;if((bits&12)===12)bits&=~12;
+        const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
+        v.setUint16(mailbox+22,bits,true);heap[mailbox+24]=focus;
+        $('diagnostics').textContent=`游戏帧 ${s.ticks} · 关卡帧 ${s.stageFrame} · ${live?'运行中':'暂停 / 非关卡状态'}\nP1 (${s.p1.map(n=>n.toFixed(1)).join(', ')}) 受击动画 ${s.p1Miss}\nP2 (${s.p2.map(n=>n.toFixed(1)).join(', ')}) 无敌 ${s.p2Inv} 受击动画 ${s.p2Miss}\nP2 射击调用 ${s.shots} · 子弹命中 ${s.shotHits} · 碰撞受击 ${s.hits}\nP2 拾取 ${s.items} · 瞄准 / 吸引选择 P2 ${s.targets}\nP2 输入 0x${bits.toString(16)} · ${focus?'低速':'通常速度'}\n手柄输入与 P1 的 SDL 输入已隔离。`;
+        $('diagnostics').textContent+='\n'+s.players.map(p=>`P${p.id} · POWER ${(Math.floor(p.power*100/32)/100).toFixed(2)} · LIFE ${p.lives} · BOMB ${p.bombs}${p.out?' · 已退场':''}`).join('\n');
+        for(const [id,xy,miss,index] of [['p1',s.p1,s.p1Miss,0],['p2',s.p2,s.p2Miss,1]]){
+          $(id).hidden=!live||miss>0||s.players[index]?.out;
+          $(id).style.left=`${(xy[0]+32)/640*100}%`;
+          $(id).style.top=`${(xy[1]+16-24)/400*100}%`;
+        }
+        $('selftest').disabled=!live||testing||s.players[1]?.out;$('hit-test').disabled=!live||testing||s.players[1]?.out;
+      }
+      if(!stageAnnounced&&launchStarted&&now-launchStarted>90000){status('加载时间较长，请查看游戏画面；可返回设置后重新开始。');launchStarted=0;}
+    }
+  }catch(e){$('diagnostics').textContent=`诊断错误：${e.message}`;}
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+$('start').onclick=async()=>{
+  $('start').disabled=true;
+  $('setup').disabled=true;
+  try{
+    launchSettings={p1:Number($('loadout-p1').value),p2:Number($('loadout-p2').value),difficulty:Number($('difficulty').value),lives:Number($('lives').value),bombs:Number($('bombs').value)};
+    const config=encodeConfig(launchSettings);
+    status('正在校验并加载实验磁盘…');
+    const response=await fetch('th04-coop.hdi.gz',{cache:'no-store'});
+    if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
+    const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    const meta=await (await fetch('disk.json',{cache:'no-store'})).json();
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),b=>b.toString(16).padStart(2,'0')).join('');
+    if(hash!==meta.sha256||data.length!==meta.size)throw Error('实验磁盘校验失败');
+    const patch=await (await fetch('patch.json',{cache:'no-store'})).json();
+    installConfig(data,patch,config);
+    emulator=await NP21.create({canvas:$('canvas'),clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'});
+    emulator.addDiskImage('th04-lab.hdi',data);emulator.setHdd(0,'th04-lab.hdi');emulator.run();
+    $('canvas').focus();$('pause').disabled=false;$('restart').disabled=false;$('capture').disabled=false;
+    launchStarted=performance.now();
+    status('正在启动游戏并载入双方机体，请稍候…');
+  }catch(e){status(`启动失败：${e.message}`);console.error(e);$('restart').disabled=false;if(!emulator){$('start').disabled=false;$('setup').disabled=false;}}
+};
+$('pause').onclick=()=>{if(!emulator)return;if(emulator.state==='running'){release();emulator.pause();$('pause').textContent='继续模拟器';}else{emulator.run();$('pause').textContent='暂停模拟器';$('canvas').focus();}};
+$('restart').onclick=()=>location.reload();
+$('fullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('screen').requestFullscreen();
+$('capture').onclick=()=>{
+  const c=document.createElement('canvas');c.width=640;c.height=400;
+  c.getContext('2d').drawImage($('canvas'),0,0);
+  const a=document.createElement('a');a.download='th04-coop.png';a.href=c.toDataURL();a.click();
+};
+
+async function inputForFrames(bits,frames,focus=0){
+  const start=snapshot();if(!start)throw Error('尚未进入关卡');
+  testInput={bits,focus};const deadline=performance.now()+10000;
+  while(snapshot().ticks-start.ticks<frames){if(performance.now()>deadline)throw Error('游戏帧停止推进，请先取消游戏暂停');await sleep(20);}
+  testInput={bits:0};return snapshot();
+}
+$('selftest').onclick=async()=>{
+  testing=true;$('tests').textContent='正在检查：只给 P2 发送移动和射击，请松开控制器…';
+  try{
+    const start=snapshot(),direction=start.p2[0]>192?4:8;
+    const moved=await inputForFrames(direction,18);
+    const fired=await inputForFrames(32,36);
+    const movedEnough=Math.abs(moved.p2[0]-start.p2[0])>20;
+    const p1Independent=Math.abs(moved.p1[0]-start.p1[0])<1&&Math.abs(moved.p1[1]-start.p1[1])<1;
+    $('tests').textContent=`${movedEnough&&p1Independent&&fired.shots>start.shots?'通过':'未通过 / 受到游戏事件干扰'}：P2 位移 ${(moved.p2[0]-start.p2[0]).toFixed(1)} px；P1 独立 ${p1Independent?'是':'否'}；P2 射击调用 +${fired.shots-start.shots}。实际击杀需结合画面和碰撞检查。`;
+  }catch(e){$('tests').textContent=`检查中止：${e.message}`;}finally{testInput=null;testing=false;release();}
+};
+$('hit-test').onclick=async()=>{
+  testing=true;
+  try{
+    let s=snapshot();if(!s)throw Error('尚未进入关卡');
+    if(s.p2Inv||s.p2Miss)throw Error('请等 P2 无敌 / 复活动画结束后再测试');
+    // Recover the guest RAM base from the live code signature and relocated DS.
+    // CS is the original main_01 segment; mailbox offset supplied by build.
+    const patch=await (await fetch('patch.json')).json();
+    const csLinear=mailbox-patch.mailbox_cs_offset;
+    // Actual load CS cannot be inferred from DS alone; locate P1 data via
+    // the exact code-to-DGROUP delta from the rebased MZ layout instead.
+    const guestData=csLinear+(patch.data_segment-patch.code_segment)*16;
+    const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
+    if(v.getInt16(guestData+0x464e,true)/16!==s.p1[0])throw Error('内存布局校验失败，未注入测试弹');
+    let slot=-1;for(let i=0;i<440;i++){const p=guestData+0x5a22+i*26;if(heap[p]===0){slot=p;break;}}
+    if(slot<0)throw Error('没有空闲敌弹位置');
+    heap.fill(0,slot,slot+26);heap[slot]=1;heap[slot+1]=2;
+    v.setInt16(slot+2,s.p2[0]*16,true);v.setInt16(slot+4,s.p2[1]*16,true);
+    v.setInt16(slot+6,s.p2[0]*16,true);v.setInt16(slot+8,s.p2[1]*16,true);
+    heap[slot+0x12]=2;heap[slot+0x13]=2;
+    $('tests').textContent='已生成测试敌弹，正在观察 P2 碰撞与复活…';
+    const after=await inputForFrames(0,100);
+    $('tests').textContent=`${after.hits>s.hits&&after.p2Miss===0?'通过':'未通过 / 被关卡清弹干扰'}：真实敌弹触发 P2 受击 +${after.hits-s.hits}，复活状态 ${after.p2Miss}，剩余无敌 ${after.p2Inv}。`;
+  }catch(e){$('tests').textContent=`检查中止：${e.message}`;}finally{testing=false;testInput=null;release();}
+};
+
+// Explicit QA URL only; ordinary play never injects state or test inputs.
+if(new URLSearchParams(location.search).get('qa')==='rescue'){
+  import('./rescue-qa.js').then(({install})=>install({
+    getEmulator:()=>emulator,snapshot,inputForFrames,nativeKey,
+    getMailbox:()=>mailbox,setTesting:value=>{testing=value;},
+    releaseTest:()=>{testInput=null;release();}
+  }));
+}
