@@ -9,6 +9,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+from turn_service import credentials as turn_credentials, TurnError
 
 PROTOCOL='th04-rollback/2'
 ROLES=('host','guest','guest2')
@@ -47,7 +48,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         url=urlparse(self.path)
-        if url.path=='/api/events':
+        if url.path=='/relay':
+            from relay_server import handle
+            handle(self,ROOMS,LOCK,ROLES,TTL)
+        elif url.path=='/api/events':
             self.api('events',{k:v[0] for k,v in parse_qs(url.query).items()})
         elif url.path.startswith('/api/'):
             self.reply({'error':'未知接口'},404)
@@ -72,12 +76,42 @@ class Handler(SimpleHTTPRequestHandler):
             self.reply({'error':'请求格式或来源不合法'},400)
 
     def api(self,action,data):
+        if action=='ice':
+            # Authenticate under the room lock; upstream HTTPS runs outside it.
+            code=str(data.get('room','')).upper()
+            with LOCK:
+                room=ROOMS.get(code)
+                now=time.monotonic()
+                if not room or now-room['seen']['host']>TTL:
+                    return self.reply({'error':'房间不存在或已结束，请重新建房'},404)
+                role=next((r for r in ROLES if room[r] and room[r]==data.get('token')),None)
+                if not role:
+                    return self.reply({'error':'房间身份无效'},403)
+                if room['phase']!='loading':
+                    return self.reply({'error':'请在全员准备并开始后获取连接配置'},409)
+                previous=room.setdefault('ice_requested',{}).get(role,0)
+                if now-previous<5:
+                    return self.reply({'error':'连接配置请求过于频繁，请稍后重试'},429)
+                room['ice_requested'][role]=now
+                identity=(code,room['generation'],role)
+            try:
+                config=turn_credentials(identity)
+            except TurnError as error:
+                return self.reply({'error':str(error)},503)
+            with LOCK:
+                current=ROOMS.get(code)
+                if not current or current['generation']!=identity[1] or current[role]!=data.get('token'):
+                    return self.reply({'error':'房间已结束或身份已失效'},403)
+            return self.reply(config)
         with LOCK:
             now=time.monotonic()
             for code,room in list(ROOMS.items()):
                 if now-room['seen']['host']>TTL:
                     del ROOMS[code]
             if action=='create':
+                transport=data.get('transport','rtc')
+                if transport not in ('rtc','ws'):
+                    return self.reply({'error':'未知传输模式'},400)
                 if data.get('protocol')!=PROTOCOL:
                     return self.reply({'error':'请刷新帧同步版网页'},400)
                 if len(ROOMS)>=64:
@@ -87,6 +121,7 @@ class Handler(SimpleHTTPRequestHandler):
                     code=secrets.token_hex(3).upper()
                 token=secrets.token_urlsafe(24)
                 ROOMS[code]={'host':token,'guest':None,'guest2':None,'queues':{r:[] for r in ROLES},
+                    'transport':transport,
                     'seen':{r:now for r in ROLES},'revision':1,'phase':'lobby','slots':{r:None for r in ROLES},
                     'ready':{r:False for r in ROLES},'generation':secrets.token_hex(8),
                     'settings':{'p1':0,'p2':2,'p3':0,'players':2,'difficulty':1,'lives':3,'bombs':2}}
@@ -96,6 +131,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not room:
                 return self.reply({'error':'房间不存在或已结束，请重新建房'},404)
             if action=='join':
+                if data.get('transport','rtc')!=room.get('transport','rtc'):
+                    return self.reply({'error':'双方传输模式不同，请使用同一个完整联机链接'},409)
                 if data.get('protocol')!=PROTOCOL:
                     return self.reply({'error':'请刷新帧同步版网页'},400)
                 available=next((r for r in ROLES[1:room['settings']['players']] if not room[r]),None)

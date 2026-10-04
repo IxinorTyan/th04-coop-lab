@@ -14,10 +14,12 @@
 // Only our explicit module/load/simulation failure paths may stop the session.
 (function(){
   function warning(message,source,stack){
+    var urls=(String(source||'')+'\n'+String(stack||'')).match(/https?:\/\/[^\s)]+/g)||[];
+    var externalScript=urls.some(function(value){try{return new URL(value).origin!==location.origin;}catch(_){return false;}});
     var text=String(message)+'\n来源：'+(source||'未提供')+'\n'+String(stack||'');
     var panel=document.getElementById('page-warning');panel.hidden=false;
     panel.textContent='页面异常记录（来源未确认，不自动结束游戏）：\n'+text;
-    window.parent.postMessage({protocol:'th04-rollback/2',event:'page-warning',message:text.slice(0,1500)},location.origin);
+    window.parent.postMessage({protocol:'th04-rollback/2',event:'page-warning',message:text.slice(0,1500),externalScript:externalScript},location.origin);
   }
   window.addEventListener('error',function(e){warning(e.message||'资源加载异常',e.filename||(e.target&&e.target.src),e.error&&e.error.stack);},true);
   window.addEventListener('unhandledrejection',function(e){warning(e.reason&&e.reason.message||String(e.reason),'未处理的 Promise',e.reason&&e.reason.stack);});

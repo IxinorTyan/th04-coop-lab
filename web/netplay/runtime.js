@@ -34,6 +34,12 @@ function nativePauseActive(){
   const at=nativePauseAddress();
   return at>=0&&emulator.module.HEAPU8[at+3]!==0;
 }
+function predictionBlockReason(){
+  if(pauseMenu.exited)return '退出同步';
+  if(pauseMenu.paused)return '同步暂停菜单';
+  if(nativePauseActive())return '原生暂停菜单尚未退出';
+  return '';
+}
 document.getElementById('bgm-volume').addEventListener('input',event=>bgm?.setVolume(Number(event.target.value)/100));
 window.addEventListener('pagehide',()=>{closed=true;bgm?.dispose();});
 document.getElementById('sound').onclick=async()=>{
@@ -280,6 +286,6 @@ window.th04Sync={
   stop(){enabled=false;closed=true;clearKeys();bgm?.dispose();if(emulator){emulator.module.netFlushAudio();emulator.pause();}},
   step,checksum,snapshot,capture,restore,confirm,
   readyForRollback:()=>mailbox>=0&&!!emulator?.module.netCapture,
-  canPredict:()=>!pauseMenu.paused&&!pauseMenu.exited&&!nativePauseActive(),
+  canPredict:()=>!predictionBlockReason(),predictionBlockReason,
   rollbackInfo:()=>emulator?.module.netSnapshotInfo()
 };

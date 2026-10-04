@@ -1,8 +1,36 @@
 # TH04 联机开发交接：后续 AI 先读
 
-更新：2026-10-03。本文是当前状态入口；README 下方按时间追加的内容、早期双人报告和跨旧作交接保留了历史方案。发生冲突时，先核对本文、最新专题报告、实际源码和构建清单，不要把历史偏移或旧验收结果套到当前版本。
+更新：2026-10-04。本文是当前状态入口；README 下方按时间追加的内容、早期双人报告和跨旧作交接保留了历史方案。发生冲突时，先核对本文、最新专题报告、实际源码和构建清单，不要把历史偏移或旧验收结果套到当前版本。
+
+## 最新交接结论
+
+用户倾向开始交接到有自有服务器的主项目。当前定位：可运行的公网双人联机原型，进入协议适配与性能验收阶段，不是流畅度已验收版本。先复用对方测试中继验证性能，再对接大厅；不要为追齐 TH06 重写 NP21 回滚。交付范围与人工验收见 [交接清单](reports/handoff-2026-10-04.md)。
+
+性能诊断 v1 已收到用户实际反馈：PC 客机 P2 同步步 1355，30.6/60 步每秒，执行平均 14.2ms、最慢 17.4ms；模拟含呈现 11.8ms/步、快照 2.4ms/次，RTT 933.5ms，确认 1343、领先 12/12，预测允许，游戏帧 695。该周期 PC 没有恢复或重算，累计回滚 0；快照 246MiB。用户仍感到延迟明显。说明此时预测生效且已到窗口边界，不证明此前等待原因，也不能凭一端快照判断全局瓶颈。没有同期手机数据；不得声称代码使帧率提升数倍、网络是唯一原因或正式服务器必然 60 步。
+
+临时 Tunnel 启动器现调用 public_tunnel.py 自动输出完整 public-ws 链接并写 public-test-url.txt；地址文件被忽略。该文件不是在线探针，强制关闭可能留下旧链接；需保持两窗口运行并检查 Registered tunnel connection。不要在交接文档硬编码会过期的 trycloudflare 域名。手机 P1 曾失败，但后来用户确认可以正常运行；根因未确认，下面排查记录不能作为当前必现缺陷。
 
 ## 工作约定
+
+性能首轮（2026-10-04，待人工复测）：优先现有联机卡顿，暂不接主项目。room.js 在 dirty 回滚前、已到采样时间且位于旧前沿时提前广播本机下一步输入，避免必须等整段补算完成后才发送；每步仍只采一次，历史重算不采样。新增“性能诊断 v1”：模拟/快照/恢复/确认/校验和重算耗时、具体等待分支、原生暂停条件与周期最大领先。未扩大 12 步窗口或改变暂停允许预测条件，不能声称已解决 2–4 步/秒。见 reports/netplay-performance-first-pass.md；仅静态检查与构建，没有运行测试。
+
+主项目中继核对（2026-10-04）：已取得 eagler-touhou-main/eagler-touhou-main/server/netplay-relay.mjs。正式中继剥除 E7 后原样转发，E8 已是旁观者标识；当前 TH04 中继不能仅换 URL 接入。大厅 P1 管理权限与 TH04 独立房主也不同。具体最小适配和分阶段验收见 reports/eagler-host-relay-integration.md。用户已实测临时 WebSocket 公网双人可以进入游戏，但约 460–640 ms RTT、2–4 同步步/秒，尚未性能验收；下方“未异网验收”是首版交付时记录。本轮只更新文档，未改运行代码、未运行测试。
+
+WebSocket 中继首版（2026-10-04，未异网验收）：新增 relay_server.py（websockets 16.0 Sans-I/O）和 web/netplay/relay.js，network=public-ws 同源 /relay 走免费 Tunnel，无需 TURN。沿用 eagler 的 E7 目标封包与开局 route 通知；E8 可信来源为本适配扩展，不声称与参考服务端直接兼容。房间锁定 rtc/ws 模式并拒绝混用，身份编号不等于游戏座位。NP21 回滚和游戏协议保持原样，room_sha256 覆盖 relay.js。操作与边界见 reports/websocket-relay.md；仅静态检查与构建，不启动游戏或测试服务。
+
+TURN 接入（2026-10-04，待账号与异网验收）：新增 turn_service.py、configure_turn.py/configure-turn.bat、本地忽略的 turn-config.local.json，按 Cloudflare 官方 API 为有效已开始房间角色生成 4 小时临时凭据。/api/ice 外部调用不占 ROOMS 锁。新增 network=public-relay 强制中继与 public-turn 自动选路；原 public-test 仍只 STUN、LAN 默认不变。详见 reports/turn-setup.md。用户没有 TURN 账号，尚未有实测凭据，不得把代码接入称为已修复公网故障。版本构建仍需运行 build_lockstep_runtime.py。
+
+公网首测入口（2026-10-04）：用户确认局域网复测正常并要求开始公网验证。新增 `lan.html?network=public-test` 固定 STUN 测试模式，默认使用 stun.cloudflare.com:3478、不含 TURN，宿主已有配置优先；结束返回保留参数。普通 LAN URL 行为不变。新增 `start-public-tunnel.bat`，需要用户安装 cloudflared 并保持现有房间服务运行；流程见 `reports/public-first-test.md`。room_sha256 现同时覆盖 room.js、connection.js、lan.js，修改后需静态构建。未确认历史偶发 ICE 根因，未宣称公网已验收。
+
+检测页诊断版 2（2026-10-04）：用户称手机加入后仍只有“等待开始检测”，站外 Player 错误只在电脑发生。发现旧检测页 render 在 peer 创建前直接返回，导致房间流程全程保留初始诊断，不能据此判定 ICE 失败。本次补充模块加载成功/失败/超时、请求加入、申请座位、准备、房主开始各阶段显示，两端在场但超过 30 秒未启动明确报告房间流程超时；未进入检测前禁用按钮。并非已定位手机 P1 故障根因。Node 静态语法检查通过，未运行测试/浏览器/游戏。
+
+最新明确复现条件（2026-10-04）：用户已澄清无论谁建房，手机选 P1 都不能运行、选 P2 正常；不要再把它等同于“手机不能建房”。静态未发现槽位 0 被当空值：队列构造允许 0、座位/ready 显式检查 None/null；连接发起按身份，NP2 初始化不按本机座位分支，原生 P1 输入发生在通道打开之后。尚未找到根因，不能宣称已修复。独立连接检测页现支持手动 P1/P2，对照保留房间座位而排除模拟器负载，下一步由用户提供两组结果。
+
+手机/电脑连接隔离排查（2026-10-04，待用户操作）：用户同 Wi-Fi 手机与电脑仍 ICE 失败、host 候选各 1，同时仍出现 BC 站外脚本异常。确认 runtime.load 7/7 只表示 NP21 初始化和磁盘挂载完成，maybeRun 等待所有通道 open/hello/ready 后才推进 DOS；无启动画面不能据此判定 NP2 未加载。新增独立 `web/connection-check.html` 与 `netplay/connection-check.js`，联机页提供链接。用户手动建房/加入后自动互发探测数据，复用现有 HTTP 房间 API、空 ICE 配置与可靠有序 DataChannel，不加载引擎/音频/回滚。它用于区分基础连通与游戏页面运行因素，不是公网修复或游戏验收。不同的检测通道标签用于拒绝与游戏房间混用，不改服务端和现有同步逻辑。未启动浏览器或执行测试。
+
+局域网建连诊断（2026-10-04，待用户复测）：用户报告同一 Wi-Fi 下偶发 30 秒 ICE 超时，双方资源 7/7、SDP stable、候选各 1；另有 sidiousious.gitlab.io/bc-addon-loader 的 `Player is not defined`，用户确认安装过脚本扩展。项目未引用该加载器，尚未证明该异常与 ICE 失败存在因果关系。新增实际 ICE 配置摘要、候选类型计数、gathering 状态与 ICE 服务错误码；超时前刷新最后快照。站外脚本堆栈独立提示暂停相关扩展复测，仍不自动结束游戏。未改回滚、通道、超时或防火墙，未设置假的 Player、未屏蔽错误。语法检查与静态构建通过；未运行游戏或测试。详见 `reports/lan-ice-and-injected-script.md`。
+
+公网接入准备（2026-10-04，未试玩）：新增 `web/netplay/connection.js`，通过 `window.th04NetplayConnection` 接受宿主的 ICE 配置或异步短期凭据函数；默认仍为空 ICE 服务列表。`room.js` 在创建 peer 前读取配置，等待时暂存信令；显示已选候选对的直连/TURN 路径，不展示地址或凭据。可靠有序通道、自有回滚、消息和掉线协议保留；尚未接通大项目信令/中继或部署公网服务。`room_sha256` 覆盖 room 与 connection 两文件，修改后运行 `tools/build_lockstep_runtime.py`。接口差异、接入示例及分阶段人工验收见 `reports/public-netplay-integration.md`。
 
 自定义操作（2026-10-04，待用户试玩）：`index.html` 与 `lan.html` 增加「自定义操作」。`web/control-settings.js` 共用键盘/手柄配置和编辑面板，localStorage 键为 `th04.controls.v1`；本地 P1、本地 P2、联机当前玩家分别保存。键盘支持移动/射击/Bomb/低速/暂停/确认，标准手柄可选按钮，左摇杆仍移动；本地手柄仍归 P2。冲突拒绝保存新绑定（包括同机两人的重复键），可清除、恢复当前默认、保存或取消。打开编辑面板会清空并阻止本机游戏输入，不自动暂停游戏。联机父页显式把设置传给 iframe，持久化失败也能在当页生效；网络只同步逻辑操作位，玩家键位不必相同。单机 P1 拦截物理键并转换为原生按键，P2 仍写独立 mailbox。`controls_sha256` 同时包含共用模块，修改它后需运行 `tools/build_lockstep_runtime.py`。仅构建和静态检查，不代表键盘、手柄或联机试玩通过。操作说明和人工验收清单见 `reports/custom-controls.md`。
 
@@ -48,7 +76,7 @@
 
 ## 当前同步结构
 
-当前协议为 **th04-rollback/2**。`lan_server.py` 只提供房间和 WebRTC 信令，默认端口 9866；每对玩家使用可靠有序的 `th04-inputs` DataChannel。不存在当前生效的快速无序通道、自适应延迟、经房主竞速转发。
+当前协议为 **th04-rollback/2**。`lan_server.py` 提供房间和 WebRTC 信令，默认端口 9866；还接入同端口 `/relay` WebSocket 中继与可选 `/api/ice`。普通 LAN 每对玩家使用可靠有序的 `th04-inputs` DataChannel；public-ws 由 relay.js 提供同伴通道接口，传输 TH04 原有消息。不支持自动 RTC/relay 选路或中途切换；不存在当前生效的快速无序通道、自适应延迟、经房主竞速转发。
 
 1. DOS 启动使用 2 步锁步。全员就绪并进入实际游戏后，主机指定未来共同步启用预测。
 2. 本地输入每步只采样一次，预测启用后无额外固定输入缓冲；最多领先连续确认前缀 12 步。远端射击/低速延续，方向最多猜 3 步，Bomb/Esc/确认不预测。

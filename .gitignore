@@ -39,9 +39,14 @@ Desktop.ini
 *.tmp
 *.swp
 .env
+# Local TURN credentials and ephemeral Quick Tunnel address (not source).
+/turn-config.local.json
+/public-test-url.txt
 .env.*
 !.env.example
 
 # Intentionally keep web/vendor (including licenses), web/bgm, the playable
 # web/th04-coop.hdi.gz, web JSON manifests, patch sources/assets and docs.
 # These generated web artifacts are the runnable distribution, not build trash.
+# Keep root relay_server.py, turn_service.py, public_tunnel.py, configure_turn.py,
+# launchers and requirements-relay.txt: they are runtime/launch dependencies.

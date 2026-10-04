@@ -78,9 +78,12 @@ export class RollbackQueue {
   }
   updateConfirmed(){while(this.inputs.every((lane,slot)=>this.isOffline(slot,this.confirmed)||lane.has(this.confirmed)))this.confirmed++;}
   peek(allowPrediction=true){
-    if(this.active&&this.frame-this.confirmed>=MAX_ROLLBACK)return null;
+    this.waitReason='';
+    if(this.active&&this.frame-this.confirmed>=MAX_ROLLBACK){this.waitReason='window';return null;}
     if(this.inputs.every((lane,slot)=>this.isOffline(slot,this.frame)||lane.has(this.frame)))return this.inputs.map((lane,slot)=>this.isOffline(slot,this.frame)?0:lane.get(this.frame));
-    if(!this.active||!allowPrediction||this.frame-this.confirmed>=MAX_ROLLBACK||!this.inputs[this.slot].has(this.frame))return null;
+    if(!this.active){this.waitReason='boot';return null;}
+    if(!allowPrediction){this.waitReason='prediction-disabled';return null;}
+    if(!this.inputs[this.slot].has(this.frame)){this.waitReason='local-input';return null;}
     return this.inputs.map((_,slot)=>this.predicted(slot,this.frame));
   }
   commit(pair){this.used.set(this.frame,pair.slice());this.frame++;}
