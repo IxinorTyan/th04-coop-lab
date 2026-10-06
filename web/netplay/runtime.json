@@ -19,7 +19,7 @@
   "rollback_queue_sha256": "aa457e19e7d979b89dba69befe672c02f9ade7d1dbfc9aafc2f4cecb46924c42",
   "native_snapshots_sha256": "3395a06775ea4b3553492ad32a7a42bf723b9fd73c94f5c25a479f8c5147ac32",
   "game_adapter_sha256": "8362b323260b2f8820cce03bfbfec7833151895ed261b1be12dc0ffaab5ea5f2",
-  "room_sha256": "20248ffe5f1ea0e8fa60a0a15d814b73e93e18f97b88470c20515cc2bc6cf381",
+  "room_sha256": "cddaaab4ddb85e24336831b4d204311fc30db9171050a27bf477ccfcc66889d0",
   "membership_sha256": "f1e2360aa7bfac3f057d4a4b7416e4e5155c6f0252d9cf4f01858e03f25b4a9a",
   "startup_sha256": "6afe88bf0d46c787b4ef42b8c09ee12f73c286a71fac395c4e3b1bbdd2c1d23b",
   "controls_sha256": "aa9f1a9c1828ebe0bade8d221f5959b2c78e9b8d8bf0430c1a0305b323bb5f76",

@@ -1,6 +1,8 @@
 // Connection facilities only. No frame/input/snapshot or membership policy here.
-// A hosting application may set th04NetplayConnection before starting a room.
-export async function loadRtcConfiguration(session,source=globalThis.th04NetplayConnection){
+// A hosting application may set th04NetplayUdp before starting a room.
+// th04NetplayConnection remains accepted as a compatibility alias.
+export const UDP_HOLE_PUNCH_API='th04-udp-hole-punch/1';
+export async function loadRtcConfiguration(session,source=globalThis.th04NetplayUdp??globalThis.th04NetplayConnection){
   if(source===undefined)return {iceServers:[],iceTransportPolicy:'all'};
   const controller=new AbortController();
   let timer;
@@ -79,7 +81,9 @@ export function describeRtcPath(stats){
   const local=stats.get(pair.localCandidateId),remote=stats.get(pair.remoteCandidateId);
   const types=[local?.candidateType,remote?.candidateType];
   const kind=types.includes('relay')?'TURN 中继':types.every(type=>['host','srflx','prflx'].includes(type))?'直连':'路径类型未知';
-  return `${kind}（${types.map(type=>type||'?').join(' / ')}）`;
+  const protocol=local?.protocol||remote?.protocol||'未知传输';
+  const relayProtocol=local?.relayProtocol||remote?.relayProtocol;
+  return `${kind}（${types.map(type=>type||'?').join(' / ')}；${protocol}${relayProtocol?`；TURN ${relayProtocol}`:''}）`;
 }
 
 export async function refreshRtcPath(peer){

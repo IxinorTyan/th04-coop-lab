@@ -15,6 +15,62 @@
 
 游戏和 NP21 模拟器在各玩家浏览器内运行。服务器负责提供静态资源、管理房间、转发操作消息，不运行游戏模拟器，不传输游戏画面或音频流。
 
+## UDP 打洞接口（负责人后续填写）
+
+公网直连入口使用浏览器 WebRTC ICE。浏览器不能直接打开原生 UDP 端口；所谓 UDP 打洞由 ICE、STUN 和必要时的 TURN 完成。当前客户端已经预留 `th04NetplayUdp` 接口，负责人只需填写部署配置，不需要修改 NP21 或回滚代码。
+
+启用入口：
+
+```text
+https://你的域名/lan.html?network=public-udp&rollback=off
+```
+
+配置文件是 `web/netplay/udp-config.js`。首测可以直接填写 STUN：
+
+```js
+export const udpConfig={
+  credentialEndpoint:'',
+  iceServers:[{urls:'stun:stun.example.cn:3478'}],
+  iceTransportPolicy:'all'
+};
+```
+
+生产环境推荐只填写同源短期凭据接口：
+
+```js
+export const udpConfig={
+  credentialEndpoint:'/integration/ice',
+  iceServers:[],
+  iceTransportPolicy:'all'
+};
+```
+
+接口接收 JSON：
+
+```json
+{"room":"ABCD","token":"短期房间令牌","role":"guest"}
+```
+
+接口返回浏览器标准 RTC 配置：
+
+```json
+{
+  "iceServers":[
+    {"urls":["stun:stun.example.cn:3478"]},
+    {"urls":["turn:turn.example.cn:3478?transport=udp"],"username":"临时用户名","credential":"临时密码"}
+  ],
+  "iceTransportPolicy":"all"
+}
+```
+
+`iceTransportPolicy` 只能是 `all` 或 `relay`。`all` 先尝试 UDP 直连，失败时允许 TURN；`relay` 强制使用 TURN，适合验证兜底路径。长期 TURN 密钥只能留在服务端，浏览器只能收到短期凭据。凭据接口必须与网页同源，或由同源反向代理转发。
+
+当前信令仍复用 `/api/signal` 和 `/api/events`。它们只交换 offer、answer、ICE candidate，不承载游戏输入。三人局需要为每一对玩家建立 ICE 连接。负责人接入正式大厅时，保持 `host=0`、`guest=1`、`guest2=2` 的身份编号，并继续单独传 TH04 座位号。
+
+连接成功后，页面会从 `getStats()` 显示 `host/srflx/prflx` 直连或 `relay` TURN 路径。只收到 candidate 不能算打洞成功，必须等候选对状态为 succeeded。直连失败时不得让游戏假装进入 UDP 模式，应显示 ICE/TURN 错误并允许回退到 `direct-ws` 或 `public-ws`。
+
+当前输入通道仍由 TH04 的 WebRTC 适配层管理。后续负责人提供生产传输层时，输入建议使用无序、零重传 DataChannel，控制和离线协商继续使用可靠有序通道；不能让控制消息和每帧输入共用一个可靠队列。
+
 **实际启动入口是 `lan_server.py`，不要单独运行 `relay_server.py`。** 后者是前者调用的模块，依赖同一进程里的房间身份和状态。
 
 如果只能提供转发入口，也可以用反向隧道把服务器公网端口转发到开发者电脑的整个 HTTP 服务，见下文。两种方式都不要求玩家自己有公网 IP。
