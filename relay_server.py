@@ -8,10 +8,65 @@ import select
 import socket
 import threading
 import time
+from collections import deque
 from urllib.parse import urlparse, parse_qs
 
 HUB_LOCK=threading.RLock()
 HUBS={}
+
+
+class OutboundWriter:
+    """One bounded FIFO per socket; room/protocol locks never cover sendall."""
+    def __init__(self,sock):
+        self.sock=sock
+        self.condition=threading.Condition()
+        self.chunks=deque()
+        self.bytes=0
+        self.stopping=False
+        self.thread=threading.Thread(target=self.run,daemon=True)
+        self.thread.start()
+
+    def abort(self):
+        with self.condition:
+            self.stopping=True
+            self.chunks.clear()
+            self.bytes=0
+            self.condition.notify()
+        try:self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:pass
+
+    def put(self,chunk):
+        with self.condition:
+            if self.stopping:raise OSError('relay writer closed')
+            # Never silently discard authoritative input. A slow destination
+            # is disconnected, allowing the existing membership protocol to act.
+            overflow=self.bytes+len(chunk)>524288 or len(self.chunks)>=256
+            if not overflow:
+                self.chunks.append(chunk)
+                self.bytes+=len(chunk)
+                self.condition.notify()
+                return
+        self.abort()
+        raise OSError('relay destination congested')
+
+    def run(self):
+        try:
+            while True:
+                with self.condition:
+                    self.condition.wait_for(lambda:self.chunks or self.stopping)
+                    if not self.chunks:return
+                    chunk=self.chunks.popleft()
+                    self.bytes-=len(chunk)
+                self.sock.sendall(chunk)
+        except OSError:
+            self.abort()
+
+    def close(self):
+        with self.condition:
+            self.stopping=True
+            self.condition.notify()
+        self.thread.join(timeout=0.25)
+        self.abort()
 
 
 def handle(handler,rooms,room_lock,roles,ttl):
@@ -43,10 +98,11 @@ def handle(handler,rooms,room_lock,roles,ttl):
     protocol=ServerProtocol(max_size=262146)
     send_lock=threading.Lock()
     handler.close_connection=True
+    writer=OutboundWriter(sock)
 
     def flush():
         for chunk in protocol.data_to_send():
-            if chunk:sock.sendall(chunk)
+            if chunk:writer.put(chunk)
 
     def send(value):
         with send_lock:
@@ -71,7 +127,8 @@ def handle(handler,rooms,room_lock,roles,ttl):
                 send({'type':'error','message':'不支持重复加入或中途重连'});return
             hub[source]=entry
             if len(hub)==count:
-                # One lock orders every route notification before any payload.
+                # Enqueue every route before any payload. These calls only
+                # append to bounded FIFOs; a slow socket cannot hold HUB_LOCK.
                 for item in hub.values():item['send']({'type':'route','mode':'relay','generation':generation})
                 for item in hub.values():item['ready']=True
         fragments=bytearray();started=time.monotonic();last_data=started
@@ -119,3 +176,4 @@ def handle(handler,rooms,room_lock,roles,ttl):
             try:
                 if protocol.state is OPEN:protocol.send_close(1000,'relay ended');flush()
             except OSError:pass
+        writer.close()

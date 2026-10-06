@@ -8,8 +8,14 @@ const HELD=32|64,DIRECTIONS=15;
 // confirmed is an exclusive contiguous prefix of authoritative inputs, not
 // the largest frame received. Prediction never advances it.
 export class RollbackQueue {
-  constructor(slot,players=2){
+  constructor(slot,players=2,{inputDelay=0,directionPrediction=3,rollbackEnabled=true}={}){
     if(![2,3].includes(players)||!Number.isInteger(slot)||slot<0||slot>=players)throw Error('无效玩家槽位');
+    // Limit delay to the prefilled boot prefix, so activation cannot create
+    // uncaptured input holes. Policy is fixed and checked during hello.
+    if(!Number.isInteger(inputDelay)||inputDelay<0||inputDelay>BOOT_DELAY||
+       !Number.isInteger(directionPrediction)||directionPrediction<0||directionPrediction>MAX_ROLLBACK||
+       typeof rollbackEnabled!=='boolean')throw Error('无效预测策略');
+    this.inputDelay=inputDelay;this.directionPrediction=directionPrediction;this.rollbackEnabled=rollbackEnabled;
     this.slot=slot;this.players=players;this.frame=0;this.confirmed=BOOT_DELAY;
     this.activation=null;this.dirty=null;this.inputs=Array.from({length:players},()=>new Map());
     this.used=new Map();
@@ -22,7 +28,7 @@ export class RollbackQueue {
     this.activation=frame;
   }
   capture(buttons){
-    const frame=this.frame+(this.active?0:BOOT_DELAY),lane=this.inputs[this.slot];
+    const frame=this.frame+(this.active?this.inputDelay:BOOT_DELAY),lane=this.inputs[this.slot];
     if(lane.has(frame))return null;
     const packet={type:'input',frame,slot:this.slot,buttons:buttons&VALID_INPUT};
     lane.set(frame,packet.buttons);this.updateConfirmed();return packet;
@@ -32,7 +38,7 @@ export class RollbackQueue {
     const lane=this.inputs[slot];
     if(lane.has(frame))return lane.get(frame);
     for(let age=1;age<=MAX_ROLLBACK;age++)if(lane.has(frame-age)){
-      return lane.get(frame-age)&(HELD|(age<=3?DIRECTIONS:0));
+      return lane.get(frame-age)&(HELD|(age<=this.directionPrediction?DIRECTIONS:0));
     }
     return 0;
   }
@@ -45,7 +51,7 @@ export class RollbackQueue {
     if(frame<Math.min(this.frame,this.confirmed)-32)return;
     if(lane.has(frame)){if(lane.get(frame)!==buttons)throw Error('同一帧收到冲突输入');return;}
     lane.set(frame,buttons);
-    // A new matching input can extend the 3-frame direction prediction
+    // A new matching input can extend the bounded direction prediction
     // horizon, so compare subsequent predictions too, not only this frame.
     for(const [at,pair]of this.used)if(at>=frame&&pair[slot]!==this.predicted(slot,at)){
       this.dirty=this.dirty===null?at:Math.min(this.dirty,at);break;

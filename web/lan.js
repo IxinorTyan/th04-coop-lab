@@ -3,6 +3,7 @@
 // their existing behavior. No arbitrary server URLs or credentials in queries.
 const networkMode=new URLSearchParams(location.search).get('network');
 if(networkMode==='public-ws')document.getElementById('status').textContent='公网 WebSocket 中继测试：无需 STUN/TURN 账号。双方使用同一完整链接，保持服务和 Tunnel 窗口开启。';
+if(networkMode==='direct-ws')document.getElementById('status').textContent='公网直连中继：房主电脑直接提供 WebSocket 服务，不经过 Cloudflare。请使用房主公网 IPv6 地址打开此页面。';
 const publicTest=['public-test','public-turn','public-relay'].includes(networkMode);
 if(publicTest){
   if(window.th04NetplayConnection===undefined){

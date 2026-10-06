@@ -238,10 +238,17 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--port',type=int,default=9866)
+    parser.add_argument('--bind',default='0.0.0.0',help='监听地址；IPv6 公网测试使用 ::')
     args=parser.parse_args()
     root=Path(__file__).resolve().parent/'web'
     try:
-        server=ThreadingHTTPServer(('0.0.0.0',args.port),partial(Handler,directory=str(root)))
+        bind=args.bind
+        server_type=ThreadingHTTPServer
+        if ':' in bind:
+            class IPv6HTTPServer(ThreadingHTTPServer):
+                address_family=socket.AF_INET6
+            server_type=IPv6HTTPServer
+        server=server_type((bind,args.port),partial(Handler,directory=str(root)))
     except OSError as error:
         raise SystemExit(f'Cannot listen on port {args.port}. Close the previous LAN server window and try again. ({error})')
     print('TH04 INPUT LOCKSTEP (not screen streaming)',flush=True)

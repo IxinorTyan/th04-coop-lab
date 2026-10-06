@@ -9,10 +9,23 @@ const label=role=>({host:'房主',guest:'客机 1',guest2:'客机 2'})[role];
 const status=text=>{$('status').textContent=text;};
 const settingNames=['players','p1','p2','p3','difficulty','lives','bombs'];
 let session,state,iframe,runtime,queue,localReady;
-const useRelay=new URLSearchParams(location.search).get('network')==='public-ws';
+const networkMode=new URLSearchParams(location.search).get('network');
+const useRelay=['public-ws','direct-ws'].includes(networkMode);
+// Rollback is deliberately opt-in for public relay: a WAN correction can cost
+// several full NP21 snapshots and make the visible frame rate worse than
+// confirmed lockstep. Use ?rollback=on on every player's URL to enable it.
+const rollbackParam=new URLSearchParams(location.search).get('rollback');
+const inputPolicy=Object.freeze({inputDelay:0,directionPrediction:useRelay?6:3,
+  rollbackEnabled:rollbackParam==='on'||(!useRelay&&rollbackParam!=='off')});
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
 let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
+let wakePending=false,wakeToken=0;
+const wakeChannel=new MessageChannel();
+wakeChannel.port1.onmessage=event=>{
+  if(event.data!==wakeToken||!wakePending)return;
+  wakePending=false;wakeTimer=null;pump(performance.now());
+};
 let waitingSince=0,replayUntil=0,rollbackCount=0,resimulated=0,maxRewind=0;
 const pendingHashes=new Map();
 let keys=new Set(),childBits=0,pendingAction=0,bits=0,inputChangedAt=0;
@@ -152,7 +165,7 @@ function recordPong(peer,id){
 function clearInput(){keys.clear();childBits=0;pendingAction=0;bits=0;}
 function clearTimers(){
   clearTimeout(pollTimer);clearTimeout(loadTimer);clearInterval(heartbeatTimer);
-  clearTimeout(wakeTimer);cancelAnimationFrame(raf);
+  cancelWake();cancelAnimationFrame(raf);
   for(const peer of peers.values())clearTimeout(peer.connectTimer);
 }
 function disconnect(){relay?.close();for(const peer of peers.values()){peer.channel?.close();peer.pc.close();}}
@@ -260,7 +273,7 @@ function attachChannel(peer,channel){
   channel.onopen=()=>{
     if(stopped){channel.close();return;}
     clearTimeout(peer.connectTimer);peer.lastPacket=performance.now();
-    try{send(peer,{type:'hello',settings:state.settings,slots:state.slots});if(localReady)send(peer,{type:'ready',build:localReady});}
+    try{send(peer,{type:'hello',settings:state.settings,slots:state.slots,inputPolicy});if(localReady)send(peer,{type:'ready',build:localReady});}
     catch(error){fail(error);}
   };
   channel.onmessage=event=>{
@@ -274,6 +287,7 @@ function attachChannel(peer,channel){
       switch(m.type){
         case 'hello':
           if(JSON.stringify(m.settings)!==JSON.stringify(state.settings)||JSON.stringify(m.slots)!==JSON.stringify(state.slots))throw Error('开局设置不一致');
+          if(m.inputPolicy?.inputDelay!==inputPolicy.inputDelay||m.inputPolicy?.directionPrediction!==inputPolicy.directionPrediction||m.inputPolicy?.rollbackEnabled!==inputPolicy.rollbackEnabled)throw Error('联机性能策略不一致，请全员刷新并使用相同网络模式');
           peer.hello=true;maybeRun();break;
         case 'ready':peer.ready=m.build;maybeRun();break;
         case 'run':
@@ -355,7 +369,7 @@ function makeRelayPeer(role){
     iceConnectionState:'不适用',signalingState:'中继',close(){channel.close();}};
   const peer={role,pc,hashes:new Map(),pings:new Map(),confirmed:0,lastPacket:performance.now(),pingId:0,path:'WebSocket 中继',signalStage:'等待全员中继就绪'};
   peers.set(role,peer);attachChannel(peer,channel);
-  peer.connectTimer=setTimeout(()=>fail(Error('等待全员 WebSocket 中继连接超过 30 秒，请确认双方链接都含 network=public-ws')),30000);
+  peer.connectTimer=setTimeout(()=>fail(Error(`等待全员 WebSocket 连接超过 30 秒，请确认双方链接都含 network=${networkMode}`)),30000);
 }
 async function signalingStep(peer,name,operation){
   peer.signalStage=name;showStartup();
@@ -424,7 +438,7 @@ async function beginGame(){
   const rtcConfiguration=useRelay?null:await loadRtcConfiguration(session);
   if(stopped)return;
   connectionConfigSummary=useRelay?'强制 WebSocket 中继（不需要 STUN/TURN 账号）':describeRtcConfiguration(rtcConfiguration);
-  queue=new RollbackQueue(state.slots[session.role],state.settings.players);
+  queue=new RollbackQueue(state.slots[session.role],state.settings.players,inputPolicy);
   if(useRelay){
     relay=createRelay(session,state.generation,roles,fail);
     for(const role of activeRoles())if(role!==session.role)makeRelayPeer(role);
@@ -491,14 +505,26 @@ function maybeRun(){
   status(`${state.settings.players} 人已同步开局，你操作 P${queue.slot+1}。`);raf=requestAnimationFrame(tick);
   showStartup();
 }
+function cancelWake(){
+  clearTimeout(wakeTimer);wakeTimer=null;wakePending=false;wakeToken++;
+}
 function wake(delay=0){
   if(!running||stopped||document.hidden)return;
-  const deadline=performance.now()+delay;if(wakeTimer!==null&&wakeAt<=deadline)return;
-  clearTimeout(wakeTimer);wakeAt=deadline;wakeTimer=setTimeout(()=>{wakeTimer=null;pump(performance.now());},Math.max(0,delay));
+  delay=Math.max(0,delay);
+  const deadline=performance.now()+delay;if(wakePending&&wakeAt<=deadline)return;
+  cancelWake();wakeAt=deadline;wakePending=true;
+  const token=wakeToken;
+  // Replay still yields after its bounded work slice, but does not pay the
+  // nested setTimeout minimum on every expensive emulator step.
+  if(delay===0)wakeChannel.port2.postMessage(token);
+  else wakeTimer=setTimeout(()=>{
+    if(token!==wakeToken||!wakePending)return;
+    wakePending=false;wakeTimer=null;pump(performance.now());
+  },delay);
 }
 function tick(){if(!running||stopped)return;pump(performance.now());if(!stopped)raf=requestAnimationFrame(tick);}
 function armRollback(){
-  if(session.role!=='host'||!running||membership||queue.activation!==null||!runtime.readyForRollback()||
+  if(!inputPolicy.rollbackEnabled||session.role!=='host'||!running||membership||queue.activation!==null||!runtime.readyForRollback()||
      !onlinePeers().every(peer=>peer.rollbackReady))return;
   // DOS boot remains confirmed-only. All devices/audio are initialized before
   // taking snapshots; every peer switches at the same future simulation tick.
@@ -558,7 +584,7 @@ function updateMetrics(now,waiting){
     +`本机 ${hz.toFixed(1)}/60 步每秒 · 执行平均 ${averageCost.toFixed(1)} / 最慢 ${peakCost.toFixed(1)} ms\n`
     +`性能诊断 v1 · 最近统计周期：模拟含呈现 ${(c.simulate/Math.max(1,c.steps)).toFixed(1)} ms/步 · 快照 ${(c.capture/Math.max(1,c.captures)).toFixed(1)} ms/次（${c.captures} 次）\n`
     +`恢复 ${c.restore.toFixed(1)} ms（${c.restores} 次） · 重算 ${c.replay.toFixed(1)} ms（${c.replays} 步，含模拟和快照） · 确认 ${c.confirm.toFixed(1)} ms · 校验 ${c.hash.toFixed(1)} ms\n`
-    +`${queue.active?'预测回滚 · 本地输入无额外缓冲':'启动锁步 · 2 步缓冲'} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
+    +`${queue.active?`预测回滚 · 本地缓冲 ${queue.inputDelay} 步 · 方向预测 ${queue.directionPrediction} 步`:inputPolicy.rollbackEnabled?'确认锁步 · 等待回滚启用':'确认锁步 · 回滚已关闭'} · 最近输入至应用 ${inputAge.toFixed(1)} ms · 已收输入 ${receivedInputs}\n${links}\n`
     +`已确认 ${Math.min(queue.frame,queue.confirmed)} · 预测领先 ${Math.max(0,queue.frame-queue.confirmed)}/${MAX_ROLLBACK} 步\n`
     +`最近周期最大领先 ${c.lead} 步 · 游戏帧 ${game?.gameFrame??'启动中'} · 预测条件：${runtime.predictionBlockReason()||'允许'} · 补算前提前发输入 ${earlyInputs} 次\n`
     +`回滚 ${rollbackCount} 次 · 重算 ${resimulated} 步 · 最长 ${maxRewind} 步 · 快照 ${((runtime.rollbackInfo()?.snapshotBytes||0)/1048576).toFixed(0)} MiB\n`
@@ -645,4 +671,4 @@ $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
 for(const name of settingNames)$(name).onchange=()=>action('settings',{settings:Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)]))});
 $('ready').onclick=()=>action('ready');$('start').onclick=()=>action('start');
-$('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{const mode=new URLSearchParams(location.search).get('network');location.href=['public-test','public-turn','public-relay','public-ws'].includes(mode)?`lan.html?network=${mode}`:'lan.html';}};
+$('leave').onclick=async()=>{stopped=true;running=false;clearInput();runtime?.stop();clearTimers();disconnect();try{await request('leave');}finally{const mode=new URLSearchParams(location.search).get('network');location.href=['public-test','public-turn','public-relay','public-ws','direct-ws'].includes(mode)?`lan.html?network=${mode}`:'lan.html';}};
