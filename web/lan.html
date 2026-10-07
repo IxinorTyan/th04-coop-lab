@@ -18,7 +18,7 @@
 <label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option><option value="3">Lunatic</option><option value="4">Extra</option></select></label>
 <label>生命 <select id="lives"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
 <label>炸弹 <select id="bombs"><option>0</option><option>1</option><option selected>2</option></select></label>
-</div></fieldset>
+</div><label class="rollback-option"><input id="rollback" type="checkbox" role="switch" aria-describedby="rollback-help"> 启用回滚</label><p id="rollback-help" class="muted">开启：操作响应更快，但占用更多性能；关闭：等待所有玩家输入，网络延迟会更明显。仅房主可在开局前修改，修改后需全员重新准备。</p></fieldset>
 <details><summary>合作玩法</summary><p>分数、点、梦、擦弹独立计算，游戏面板显示自己的数据。双人得分 ×1.5，三人 ×2.2。</p><p>Power 获取：双人 ×1.5，三人 ×2（半点收益累计）。Boss 每阶段耐久：双人 ×1.5，三人 ×2.2。倍率按开局人数固定。启用 3P 后需三人全员准备。</p></details>
 <div class="row"><button id="ready">准备</button><button id="start" class="primary">房主开始游戏</button><button id="leave">结束并返回</button></div>
 </section>

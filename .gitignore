@@ -27,6 +27,8 @@
 !/tools/test_np21_dispatch.mjs
 !/tools/test_dispatch_browser.cjs
 !/tools/test_rollback_queue.mjs
+!/tools/test_rollback_setting.py
+!/tools/test_rollback_setting_browser.cjs
 !/tools/test_native_snapshots.mjs
 !/tools/profile_solo_browser.cjs
 !/tools/audit_np21_table.cjs

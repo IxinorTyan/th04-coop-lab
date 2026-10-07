@@ -229,3 +229,10 @@ python tools/build_lockstep_runtime.py
 生成器共同导入 `tools/optimize_np21_dispatch.py`（分发时必须携带此依赖）。当前固定哈希的 NP21 table 只在实例初始化时安装，485169 行 WASM 反汇编中没有 table.set/init/copy/fill/grow；JS 也无 table 写入。逐实例缓存 getWasmTableEntry 的函数引用，禁止在未经审计的新 WASM 上自动应用。不改 invoke_v 的栈/异常路径，不改指令、时钟、内存、音效或弹幕。联机生成摘要随之更新。
 
 单机流程浏览器检查、真实 NP21 原查询/缓存查询的游戏状态校验和对照与 restore/replay 检查通过。`tools/test_dispatch_browser.cjs` 需要 9886 QA 服务器；它以浏览器路由切换查询实现，按相同逻辑输入步进。`tools/audit_np21_table.cjs` 通过 CDP 对 WASM 反汇编审计。`tools/profile_solo_browser.cjs` 将无 Profiler 时的计时与另一个采样窗口分开；设置 TABLE_CACHE=0 测原查询，默认测当前缓存实现。CPU 节流只是压力测试，不能模拟具体手机。
+
+
+## 2026-10-07 房主回滚开关
+
+房间 settings 增加严格布尔值 rollback，服务器创建房间时默认 rtc=true、ws=false；旧 URL rollback 参数仅作为房主新建房间的初值，客机 URL 不决定策略。只有房主可在 lobby 修改，修改后清空全员准备，loading 后服务器拒绝变更。客机开关由禁用的房主设置 fieldset 展示。beginGame 从锁定房间值生成 inputPolicy，hello 校验保持；RollbackQueue.arm 对 rollbackEnabled=false 直接拒绝。
+
+测试：真实服务端 handler 覆盖默认值、客机权限、非法布尔值、房主 P2、准备重置和开局锁定；双浏览器通过真实 HTTP 房间接口验证状态同步及客机相反 URL 不影响设置；队列测试验证关闭时不能预测或启用回滚。浏览器房间测试拦截了游戏 iframe，只验证大厅，不作为真实多端战斗测试。新增 tools/test_rollback_setting.py、tools/test_rollback_setting_browser.cjs（需 9887 房间 QA 服务）。更新后重启 start-lan.bat、所有玩家刷新并重建房间。

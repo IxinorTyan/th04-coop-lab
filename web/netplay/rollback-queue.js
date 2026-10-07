@@ -25,7 +25,7 @@ export class RollbackQueue {
   }
   get active(){return this.activation!==null&&this.frame>=this.activation;}
   arm(frame){
-    if(this.activation!==null||!Number.isSafeInteger(frame)||frame<this.frame||frame>this.frame+240)throw Error('无效回滚启用帧');
+    if(!this.rollbackEnabled||this.activation!==null||!Number.isSafeInteger(frame)||frame<this.frame||frame>this.frame+240)throw Error('无效回滚启用帧');
     this.activation=frame;
   }
   capture(buttons){

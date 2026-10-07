@@ -45,3 +45,10 @@ assert.throws(()=>policy.receive(2,0,1));
 assert.throws(()=>policy.receive(2,0,0));
 assert.throws(()=>policy.receive(999,0,1));
 console.log('PASS: 2/3P replay parity, all local seats, bounded speculation and button policy');
+
+// Disabling rollback must reject activation and block on missing remote input.
+const disabled=new RollbackQueue(0,2,{rollbackEnabled:false});
+assert.throws(()=>disabled.arm(0));
+for(let i=0;i<2;i++){disabled.capture(32);disabled.commit(disabled.peek());}
+disabled.capture(32);assert.equal(disabled.peek(),null);
+console.log('PASS: disabled rollback cannot activate or predict missing input');

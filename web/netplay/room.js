@@ -15,12 +15,10 @@ const settingNames=['players','difficulty','lives','bombs'];
 let session,state,iframe,runtime,queue,localReady;
 const mode=readNetworkMode(),networkMode=mode.network;
 const useRelay=mode.transport==='ws';
-// Rollback is deliberately opt-in for public relay: a WAN correction can cost
-// several full NP21 snapshots and make the visible frame rate worse than
-// confirmed lockstep. Use ?rollback=on on every player's URL to enable it.
-const rollbackParam=new URLSearchParams(location.search).get('rollback');
-const inputPolicy=Object.freeze({inputDelay:0,directionPrediction:useRelay?6:3,
-  rollbackEnabled:rollbackParam==='on'||(!useRelay&&rollbackParam!=='off')});
+// Legacy URL preference only seeds a newly created room. Joining clients
+// always use the host's server-authoritative setting, frozen at game start.
+const defaultRollback=mode.rollback==='on'||(!useRelay&&mode.rollback!=='off');
+let inputPolicy;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
 let pollTimer,heartbeatTimer,loadTimer,raf,wakeTimer=null,wakeAt=0;
@@ -64,7 +62,7 @@ $('game').querySelector('.player-toolbar').append(rawView);
 if(!useRelay){
   const relayLink=document.createElement('a');
   const relayUrl=new URL(networkUrl({...mode,transport:'ws'}),location.href);
-  relayUrl.searchParams.set('rollback',inputPolicy.rollbackEnabled?'on':'off');
+  relayUrl.searchParams.delete('rollback');
   relayLink.href=relayUrl.href;relayLink.className='player-relay-link';
   relayLink.textContent='退出本局，改用 WebSocket 重新建房';
   relayLink.title='所有玩家都需点击此入口，重新建房／加入；沿用当前网页服务器转发操作，不需要 TURN。';
@@ -241,6 +239,7 @@ function render(){
   }
   $('settings').disabled=!lobby||busy||session.role!=='host';
   for(const key of settingNames)$(key).value=state.settings[key];
+  if(!busy)$('rollback').checked=state.settings.rollback;
   const loadoutSlot=slot===null?null:`p${slot+1}`;
   $('loadout-panel').hidden=slot===null||!lobby;
   if(loadoutSlot){
@@ -258,7 +257,7 @@ function render(){
 }
 function update(value){
   if(stopped)return;
-  if(!value||value.protocol!==PROTOCOL)throw Error('请重启新版 start-lan.bat 并刷新所有玩家的页面');
+  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean')throw Error('请重启新版 start-lan.bat 并刷新所有玩家的页面');
   if(state&&value.revision<=state.revision)return;
   state=value;render();
   if(state.phase==='ended'){closeDisconnected('房主已离开');return;}
@@ -281,7 +280,7 @@ async function enter(role){
   if(busy||session)return;busy=true;$('create').disabled=true;$('join').disabled=true;
   try{
     if(role!=='host'&&!/^[0-9]{4}$/.test($('room').value.trim()))throw Error('请输入四位数字房间号');
-    const result=await request(role==='host'?'create':'join',{room:$('room').value.trim().toUpperCase()});
+    const result=await request(role==='host'?'create':'join',{room:$('room').value.trim().toUpperCase(),...(role==='host'?{rollback:defaultRollback}:{})});
     if(result.protocol!==PROTOCOL)throw Error('请重新启动新版 start-lan.bat');
     session={room:result.room,token:result.token,role:result.role};update(result.state);
     status('房主选择双人或三人模式；所有玩家分别选座并准备后开始。');poll();
@@ -484,6 +483,7 @@ async function receivedSignal({from,message}){
   }else throw Error('未知信令');
 }
 async function beginGame(){
+  inputPolicy=Object.freeze({inputDelay:0,directionPrediction:useRelay?6:3,rollbackEnabled:state.settings.rollback});
   bootStartedAt=performance.now();
   if(!useRelay&&!window.RTCPeerConnection)throw Error('请使用新版 Chrome 或 Edge');
   connectionConfigPending=true;
@@ -735,7 +735,10 @@ window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/le
 $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
 for(const card of document.querySelectorAll('[data-loadout]'))card.onclick=()=>action('loadout',{loadout:Number(card.dataset.loadout)});
-for(const name of settingNames)$(name).onchange=()=>action('settings',{settings:Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)]))});
+for(const name of [...settingNames,'rollback'])$(name).onchange=()=>{
+  if(session?.role!=='host'||state?.phase!=='lobby')return;
+  action('settings',{settings:{...Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)])),rollback:$('rollback').checked}});
+};
 $('ready').onclick=()=>{
   if(!state.ready[session.role]&&session.role!=='host')player.note('已准备，等待房主开始。房主开始后进入游戏画面。');
   action('ready');

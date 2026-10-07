@@ -34,3 +34,7 @@ body.shell:has(#entry) .loadout-card[aria-pressed=true] small{color:#f0cbd2}
 body.shell:has(#entry) #loadout-status{margin-top:12px;margin-bottom:0;color:#d898a8}
 @media(max-width:720px){body.shell:has(#entry) .intro{display:block;margin:28px 0 20px}body.shell:has(#entry) .intro p{text-align:left;margin-top:10px}body.shell:has(#entry) #entry{grid-template-columns:1fr}body.shell:has(#entry) #entry>div{min-height:160px}body.shell:has(#entry) #lobby{padding:18px 14px}}
 @media(max-width:720px){body.shell:has(#entry) .loadout-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+body.shell .rollback-option{display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer}
+body.shell .rollback-option input{width:20px;height:20px;flex:none;accent-color:var(--pink)}
+body.shell #rollback-help{font-size:13px;line-height:1.6;margin-bottom:0}
