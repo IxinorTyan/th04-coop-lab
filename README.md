@@ -2,7 +2,7 @@
 
 基于 NP21 WASM 运行《东方幻想乡》，提供独立原版单机、本地双人和双人／三人网络合作。当前版本：2026-10-07，联机协议 `th04-rollback/3`。
 
-维护前先读 [DEVELOPMENT.md](DEVELOPMENT.md)。历次开发记录已移到 [README 历史归档](reports/readme-history-through-2026-10-07.md)，其中旧协议、固定内存偏移和当时的验收状态不代表当前版本。
+本仓库上传的是可直接运行的版本：包含网页、游戏资源、服务器和启动器，不需要构建工具。开发源码、基线磁盘和测试报告仅保留在维护者本地。
 
 ## 启动
 
@@ -27,7 +27,7 @@
 
 单机使用独立的 `web/th04-solo.hdi.gz`，保留原版开头、标题、选人、关卡与暂停流程，不加载合作玩法或房间运行时。原生补丁只接入触摸移动和可选判定点显示。
 
-当前磁盘写入只保留在本次运行，刷新／重启会恢复初始磁盘。构建与验证边界见 [单机模式记录](reports/solo-mode-2026-10-07.md)。
+当前磁盘写入只保留在本次运行，刷新／重启会恢复初始磁盘。
 
 ## 操作与触屏
 
@@ -49,9 +49,9 @@
 
 联机各端运行自己的模拟器并交换输入，不传输游戏画面。房间“本局设置”提供“启用回滚”开关，只有房主能在开局前修改；客机只读并自动跟随，修改后全员需重新准备，开局后锁定。开启时优先降低操作等待，关闭时使用确认锁步以减少预测／重算负担，但网络延迟更明显。默认设备直连开启、WebSocket 转发关闭，房主可自行调整。房主掉线会结束本局，客机确认离线后转为离线幽灵，剩余玩家可继续；暂不支持断线重连或主机迁移。
 
-具体规则和限制见 [开发交接](DEVELOPMENT.md)、[三人玩法](reports/three-player-design.md)、[原版暂停](reports/native-pause.md) 与 [掉线处理](reports/disconnection.md)。这些报告含历史实现细节，协议和资源版本以当前代码与生成清单为准。
 
-合作计分已修复固定奖励误读寄存器、导致 P1 分数突然封顶为全 9 的问题，详见 [计分修正记录](reports/personal-score-2026-10-07.md)。更新后需刷新并重开游戏。
+
+合作计分已修复固定奖励误读寄存器、导致 P1 分数突然封顶为全 9 的问题。更新后需刷新并重开游戏。
 
 ## 帧率与性能
 
@@ -61,43 +61,14 @@
 
 已通过单机流程、触摸操作、本地合作启动，以及真实 NP21 优化前后的状态校验和与回滚重放对照。尚未完成手机真机性能对照、完整通关及全部 Boss 特殊碰撞适配，也不能据此宣称真实多端网络已全面验收。
 
-详细证据：[60 帧上限](reports/frame-limit-2026-10-07.md) · [性能优化与测试](reports/performance-2026-10-07.md)。
 
-## 维护与构建
 
-以下命令均在 `th04-coop-lab` 目录执行。日常启动使用已生成资源；磁盘重建仅供维护使用。
+## 上传与更新
 
-```powershell
-# 重建本地和联机运行适配器、资源指纹；start-lan.bat 会自动执行
-python tools/build_lockstep_runtime.py
+上传完整的 `web/`（包括游戏磁盘、音乐、字体、JS/WASM 和版本清单），以及根目录启动器、服务端模块、依赖清单和使用说明。`.gitignore` 采用根目录白名单，其他开发文件默认不上传。
 
-# 只重建本地／单机限帧与函数表缓存适配器
-python tools/build_frame_runtime.py
-```
+`start-lan.bat` 直接启动房间服务，不再调用构建器。下载者安装 Python 后即可启动；使用 WebSocket 转发时另运行 `install-relay.bat` 安装依赖。临时公网隧道还需要 cloudflared。
 
-联机构建器依赖 `build_frame_runtime.py`、`optimize_np21_dispatch.py`、`build_rollback_wasm.py` 和 `lan_sound_config.py`，分发时必须一并保留。函数表缓存仅适用于已审计哈希的 NP21 WASM，升级上游后必须重新审核。
+维护者应在本地完成构建，再一起更新已生成的磁盘、适配器和清单，避免混用不同版本。上传包不包含 tools、patches、reports、原版基线或编译器，不能用于从源码重建。
 
-重建磁盘还需要被忽略的本地基线 `baseline/`、合作版提取文件 `extracted/`，以及构建器指定的 `tools/nasm-2.16.03/nasm.exe`。这些文件不会由普通启动器自动下载。
-
-```powershell
-# 合作磁盘：必须保留现有模拟器包装器
-python tools/build_lab.py --keep-vendor
-# 独立原版单机磁盘
-python tools/build_solo.py
-# 磁盘或联机相关源码变化后，刷新适配器和版本指纹
-python tools/build_lockstep_runtime.py
-```
-
-省略 `--keep-vendor` 的合作构建会复制旧 vendor 文件并覆盖现有包装器，不作为当前推荐流程。
-
-回归和性能工具见上述验证报告。浏览器工具需要先启动 9886 QA 服务器，且 Playwright／浏览器路径需适配本机；CPU 补丁测试另需 Unicorn 和相应基线资源。这里的工具说明不代表完整真机验收。
-
-## 仓库与分发内容
-
-- `web/`：可直接运行的网页、两份游戏磁盘、音乐、NP21 JS/WASM、字体及版本清单，应保留。
-- `patches/`：原生补丁与必需资源；`tools/` 中允许提交的构建器及当前回归工具应保留。
-- 根目录服务器、启动器、`requirements-relay.txt`、说明文档和 `reports/*.md` 应保留。
-- `build/`、`baseline/`、`extracted/`、`reference/`、`vendor-source/`、本地工具二进制、测试截图／采样输出、日志、缓存应忽略。
-- `turn-config.local.json`、`.env` 等本机配置及 `public-test-url.txt` 临时网址应忽略；`.env.example` 可保留。
-
-`.gitignore` 不会自动移除已经跟踪的文件；更新忽略规则不等于删除本地文件。
+本机 TURN 配置、临时公网网址和缓存不上传。忽略或取消跟踪这些文件不会删除维护者的本地副本。
