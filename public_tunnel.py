@@ -19,7 +19,7 @@ def main():
             match = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com\b', line)
             if not match:
                 continue
-            url = match.group(0) + '/lan.html?network=public-ws'
+            url = match.group(0) + '/lan.html?network=public&transport=ws'
             if url == last_url:
                 continue
             last_url = url

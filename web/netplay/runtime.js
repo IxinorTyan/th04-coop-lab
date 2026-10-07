@@ -1,10 +1,20 @@
+import {createFrameGate} from '../frame-limit.js';
 import {NP21} from '../vendor/np2/np2-wasm.js';
+import {writeNativeTouch,touchPlayer} from '../native-touch.js';
 import {encodeConfig,installConfig} from '../launch-config.js';
 import {sha256} from './sha256.js';
 import {isBound,keyboardBits} from './controls.js';
 import {useControlSnapshot,isFormTarget,controlsSummary} from '../control-settings.js';
 import {PauseMenu} from './pause.js';
+import {createPersonalHud} from './personal-hud.js';
 const canvas=document.getElementById('canvas'),details=document.getElementById('details');
+const nativeCanvas=document.createElement('canvas');
+nativeCanvas.width=640;nativeCanvas.height=400;nativeCanvas.hidden=true;
+nativeCanvas.style.display='none';
+document.body.append(nativeCanvas);
+const presentPersonalHud=createPersonalHud(canvas,nativeCanvas);
+let rawPresentation=false,presentationCount=0;
+const presentationDue=createFrameGate();
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
 const keyTable=[['ArrowUp','ArrowUp',38,1],['ArrowDown','ArrowDown',40,2],['ArrowLeft','ArrowLeft',37,4],['ArrowRight','ArrowRight',39,8],['KeyX','x',88,16],['KeyZ','z',90,32],['ShiftLeft','Shift',16,64],['Escape','Escape',27,128],['Enter','Enter',13,256]];
 let emulator,patch,soundPolicy,bgm,musicTask,closed=false,bootPromise,oldP1=0,ticks=0,inputListener=()=>{},keys=new Set(),enabled=false,mailbox=-1;
@@ -70,7 +80,7 @@ async function get(path,type='json'){
 }
 async function bootProgress(message,step){
   details.textContent=`启动进度：${message}`;
-  window.parent.postMessage({protocol:'th04-rollback/2',event:'boot-progress',message,step},location.origin);
+  window.parent.postMessage({protocol:'th04-rollback/3',event:'boot-progress',message,step},location.origin);
   // Give the parent page a chance to display the stage before expensive work.
   await new Promise(resolve=>setTimeout(resolve,0));
 }
@@ -100,10 +110,10 @@ async function boot(config){
   }
   for(const edit of sound.edits)edit.targets.forEach((at,i)=>{disk[at]=edit.values[i];});
   await bootProgress('下载、编译并初始化 NP2 WASM 与音频设备',5);
-  emulator=await NP21.create({canvas,lockstep:true,lockstepEpoch:version.epoch,
+  emulator=await NP21.create({canvas:nativeCanvas,lockstep:true,lockstepEpoch:version.epoch,
     clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:40,SampleHz:44100,SNDboard:4,
     no_mouse:true,use_menu:false,fontfile:'font.bmp',
-    onExit:()=>{enabled=false;closed=true;bgm?.dispose();window.parent.postMessage({protocol:'th04-rollback/2',event:'runtime-exit'},location.origin);}});
+    onExit:()=>{enabled=false;closed=true;bgm?.dispose();window.parent.postMessage({protocol:'th04-rollback/3',event:'runtime-exit'},location.origin);}});
   if(closed){emulator.pause();return;}
   await bootProgress('挂载游戏磁盘',6);
   emulator.addDiskImage('th04-sync.hdi',disk);emulator.setHdd(0,'th04-sync.hdi');
@@ -111,7 +121,7 @@ async function boot(config){
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
-  return {disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
+  return {presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);
@@ -132,9 +142,15 @@ function applyP1(bits){
   oldP1=bits;
 }
 function stepInner(inputs){
+  const touchInputs=inputs;
   if(!enabled)throw Error('本机游戏没有运行');
   // There is no native stage pause before the first gameplay mailbox exists.
   if(mailbox<0&&emulatedTicks%15===0)findMailbox();
+  if(mailbox>=0){
+    emulator.module.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.focus_visible_mask_cs_offset]=
+      inputs.reduce((mask,value,slot)=>mask|((value&2048)?1<<slot:0)|(Math.floor(value/2**42)%2?1<<(slot+3):0),0);
+  }
+  inputs=inputs.map(value=>(value&4095)&~2048);
   const wasPaused=pauseMenu.paused,result=mailbox>=0?pauseMenu.step(inputs):'play';
   ticks++;
   if(result==='exit')return 'exit';
@@ -160,6 +176,7 @@ function stepInner(inputs){
       heap[at]=inputs[slot]&63;heap[at+1]=0;heap[at+2]=(inputs[slot]>>>6)&1;
     }
   }
+  writeNativeTouch(emulator.module.HEAPU8,mailbox,patch,touchInputs,pauseMenu.paused||active||result==='resume');
   emulator.step();emulatedTicks++;
   if(mailbox>=0&&!musicError){
     try{currentEffect.music=readMusic();}
@@ -182,6 +199,8 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
   try{
     if(mailbox>=0)emulator.module.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.offline_mask_cs_offset]=offlineMask;
     currentEffect.result=stepInner(inputs);effects.set(frame,currentEffect);
+    if(!replay&&presentationDue(performance.now())){presentationCount++;presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox,patch,slot:localSlot,
+      guestBase:mailbox>=0?guestBase():0});}
     return currentEffect.result;
   }finally{emulator.module.netEndFrame();replaying=false;currentEffect=null;}
 }
@@ -274,6 +293,20 @@ function checksum(){
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:v.getUint32(mailbox+16,true)};
 }
 window.th04Sync={
+  diagnosticText:()=>`${details.textContent}\n画面提交 ${presentationCount} · ${rawPresentation?"原始画面":"个人 HUD"}`,
+  setRawPresentation(value){rawPresentation=!!value;},
+  setMusicVolume(value){document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},
+  touchContext(){
+    if(!enabled||mailbox<0)return {key:'boot',play:false};
+    const heap=emulator.module.HEAPU8,p=touchPlayer(heap,mailbox,patch,localSlot);
+    const stage=new DataView(heap.buffer).getUint16(mailbox+26,true),paused=pauseMenu.paused||nativePauseActive();
+    return {key:`${stage}:${paused?'menu':'game'}`,play:!paused&&!p.miss&&!p.entry&&!p.out};
+  },
+  async unlockAudio(){
+    const context=emulator?.module.SDL2?.audioContext;
+    if(context&&context.state!=='running')await context.resume();
+    return context?.state==='running';
+  },
   updateControls(value,editing=false){clearKeys();useControlSnapshot(value);controlsBlocked=editing;document.getElementById('controls-summary').textContent=controlsSummary('online');},
   configure(host,local,players=2){
     if(![2,3].includes(players)||![host,local].every(n=>Number.isInteger(n)&&n>=0&&n<players))throw Error('无效暂停菜单座位');

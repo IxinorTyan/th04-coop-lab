@@ -1,24 +1,68 @@
 {
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
-  "patched_size": 167266,
+  "patched_size": 167874,
   "insert_image_offset": 78048,
-  "insert_size": 11008,
-  "payload_size": 11006,
-  "heap_bytes": 382720,
+  "insert_size": 11616,
+  "payload_size": 11616,
+  "heap_bytes": 382112,
   "payload_and_heap_bytes": 393728,
-  "payload_padding_bytes": 2,
-  "mailbox_cs_offset": 37804,
+  "payload_padding_bytes": 0,
+  "mailbox_cs_offset": 38008,
   "relocations_rebased": 1136,
-  "native_pause_cs_offset": 44983,
-  "offline_mask_cs_offset": 45108,
-  "loadout_cs_offset": 38493,
-  "loadout_file_offset": 88397,
-  "bomb_owner_cs_offset": 38974,
-  "entry_count": 57,
-  "rescue_cs_offset": 39183,
-  "p3_input_cs_offset": 43627,
-  "p3_motion_cs_offset": 43630,
+  "native_pause_cs_offset": 43434,
+  "offline_mask_cs_offset": 43559,
+  "focus_visible_mask_cs_offset": 43745,
+  "personal_stats": {
+    "cs_offset": 44021,
+    "stride": 20,
+    "players": 3,
+    "bonus_cs_offset": 44081,
+    "score": 0,
+    "high_score": 4,
+    "point": 8,
+    "dream_count": 9,
+    "dream": 10,
+    "graze": 12,
+    "total_point": 14,
+    "max_point": 16,
+    "extends": 18,
+    "score_cap": 99999999
+  },
+  "score_multiplier": {
+    "2_players": 1.5,
+    "3_players": 2.2
+  },
+  "score_award_hooks": [
+    67336,
+    93495,
+    98157,
+    106367,
+    106473,
+    107009,
+    117033,
+    117041,
+    117440,
+    117697,
+    120833,
+    121363,
+    122280
+  ],
+  "power_pickup_multiplier": {
+    "2_players": 1.5,
+    "3_players": 2,
+    "fraction_resource_offset": 12
+  },
+  "loadout_cs_offset": 38697,
+  "loadout_file_offset": 88601,
+  "bomb_owner_cs_offset": 39192,
+  "entry_count": 79,
+  "touch_cs_offset": 45393,
+  "touch_stride": 8,
+  "touch_status_cs_offset": 45417,
+  "rescue_cs_offset": 39401,
+  "p3_input_cs_offset": 42078,
+  "p3_motion_cs_offset": 42081,
   "boss_damage_call_sites": [
     124409,
     111620,
@@ -57,7 +101,7 @@
     130619,
     130950
   ],
-  "added_relocations": 12,
+  "added_relocations": 25,
   "resource_schema": {
     "offset": 609,
     "stride": 16,
@@ -69,123 +113,159 @@
   },
   "hooks": [
     {
+      "image_offset": 68469,
+      "original": "e8d8fd",
+      "target_cs_offset": 45604,
+      "name": "synchronized direct touch velocity"
+    },
+    {
       "image_offset": 43934,
       "original": "9ac4060e13",
-      "target_cs_offset": 45121,
+      "target_cs_offset": 43572,
       "name": "offline seats before world update"
     },
     {
       "image_offset": 43950,
       "original": "e81e07",
-      "target_cs_offset": 44999,
+      "target_cs_offset": 43450,
       "name": "native pause entry"
     },
     {
       "image_offset": 45783,
       "original": "9abc060e13",
-      "target_cs_offset": 45020,
+      "target_cs_offset": 43471,
       "name": "pause release at entry"
     },
     {
       "image_offset": 45851,
       "original": "9a33010e13",
-      "target_cs_offset": 45041,
+      "target_cs_offset": 43492,
       "name": "pause synchronized menu input"
     },
     {
       "image_offset": 45991,
       "original": "9abc060e13",
-      "target_cs_offset": 45020,
+      "target_cs_offset": 43471,
       "name": "pause release at resume"
     },
     {
       "image_offset": 44918,
       "original": "e85702",
-      "target_cs_offset": 34402,
+      "target_cs_offset": 34446,
       "name": "stage init"
     },
     {
       "image_offset": 44001,
       "original": "e8db5e",
-      "target_cs_offset": 34712,
+      "target_cs_offset": 34829,
       "name": "player update"
     },
     {
       "image_offset": 44056,
       "original": "e8e25f",
-      "target_cs_offset": 34992,
+      "target_cs_offset": 35115,
       "name": "player render"
     },
     {
       "image_offset": 52062,
       "original": "e8813c",
-      "target_cs_offset": 34969,
+      "target_cs_offset": 35092,
       "name": "background invalidation"
     },
     {
       "image_offset": 68528,
       "original": "ff169a44",
-      "target_cs_offset": 34883,
+      "target_cs_offset": 35006,
       "name": "shot dispatch"
     },
     {
       "image_offset": 68279,
       "original": "e887da",
-      "target_cs_offset": 36234,
+      "target_cs_offset": 36394,
       "name": "last life / retirement"
     },
     {
       "image_offset": 61041,
       "original": "c41e86ba26807f0b63772726fe470b",
-      "target_cs_offset": 36441,
+      "target_cs_offset": 36604,
       "name": "score extend for survivors"
     },
     {
       "image_offset": 44004,
       "original": "e8cf58",
-      "target_cs_offset": 38782,
+      "target_cs_offset": 38986,
       "name": "shared shots and independent lasers update"
     },
     {
       "image_offset": 44053,
       "original": "e83a59",
-      "target_cs_offset": 38826,
+      "target_cs_offset": 39030,
       "name": "shared shots and independent lasers render"
     },
     {
       "image_offset": 52065,
       "original": "e8e038",
-      "target_cs_offset": 38855,
+      "target_cs_offset": 39059,
       "name": "shared shots and independent lasers invalidate"
     },
     {
       "image_offset": 67332,
       "original": "660fb7c7",
-      "target_cs_offset": 38883,
+      "target_cs_offset": 39087,
       "name": "guest laser damage"
     },
     {
       "image_offset": 44944,
       "original": "e8a14f",
-      "target_cs_offset": 38977,
+      "target_cs_offset": 39195,
       "name": "preload both Bomb characters"
     },
     {
       "image_offset": 65530,
       "original": "c606684301",
-      "target_cs_offset": 39041,
+      "target_cs_offset": 39259,
       "name": "latch Bomb owner"
+    },
+    {
+      "image_offset": 67043,
+      "original": "33ffc646f100",
+      "target_cs_offset": 44700,
+      "name": "reset hit ownership"
+    },
+    {
+      "image_offset": 67135,
+      "original": "03f8fe064046",
+      "target_cs_offset": 44724,
+      "name": "record shot damage owner"
+    },
+    {
+      "image_offset": 67195,
+      "original": "83c705803e5c1b00",
+      "target_cs_offset": 44762,
+      "name": "record Bomb damage owner"
+    },
+    {
+      "image_offset": 67252,
+      "original": "83c703fe064046",
+      "target_cs_offset": 44787,
+      "name": "record first P1 laser"
+    },
+    {
+      "image_offset": 67300,
+      "original": "83c703fe064046",
+      "target_cs_offset": 44787,
+      "name": "record second P1 laser"
     },
     {
       "image_offset": 44039,
       "original": "e80056",
-      "target_cs_offset": 39085,
+      "target_cs_offset": 39303,
       "name": "render owner Bomb resources"
     }
   ],
-  "sha256": "709f44bd5372122abdc8114f7a72b1c13706a662bb25e1d261a2be3aa808beac",
+  "sha256": "c0c1678920b0f535b2c9dbcef9ce7b2549f0f9cda97974e2d8e24b39f6b510b0",
   "code_segment": 2735,
-  "data_segment": 9188,
+  "data_segment": 9226,
   "launch_config": {
     "schema": 2,
     "defaults": [
@@ -203,17 +283,17 @@
     ],
     "targets": [
       [
-        8279373,
-        8279374,
-        8279375,
-        8279376,
-        8279377,
-        8279378,
-        8279379,
-        8279380,
-        8279381,
-        8279382,
-        8279383
+        8279577,
+        8279578,
+        8279579,
+        8279580,
+        8279581,
+        8279582,
+        8279583,
+        8279584,
+        8279585,
+        8279586,
+        8279587
       ],
       [
         326673,

@@ -5,14 +5,18 @@ The upstream main_loop reads SDL ticks, then executes its fixed pccore frames.
 The native memory/global snapshot and host journal restore that virtual clock.
 """
 from pathlib import Path
+from optimize_np21_dispatch import optimize_dispatch
 import hashlib
 import json
 from lan_sound_config import native_sound_config
 from build_rollback_wasm import build as build_rollback_wasm
+from build_frame_runtime import build as build_frame_runtime
 
 ROOT=Path(__file__).resolve().parents[1]
 VENDOR=ROOT/'web/vendor/np2'
+build_frame_runtime()
 source=(VENDOR/'np21.js').read_text(encoding='utf-8')
+source=optimize_dispatch(source,VENDOR)
 rollback_wasm=build_rollback_wasm(VENDOR)
 
 def replace(old,new):
@@ -68,22 +72,24 @@ source=source[:start]+'''181622:($0,$1,$2,$3)=>{netHost.openAudio(Module["SDL2"]
 replace('184897:($0,$1,$2)=>{var w=$0;',
         '184897:($0,$1,$2)=>{if(netHost.replaying)return;var w=$0;')
 source='import {createNativeSnapshots} from "../../netplay/native-snapshots.js";\nimport {createDeterministicHost} from "../../netplay/np2-clock.js";\n'+source
-(VENDOR/'np21-lockstep.js').write_text(source,encoding='utf-8')
-manifest={'protocol':'th04-rollback/2','adapter':'np21-rollback-v2',
+(VENDOR/'np21-lockstep.js').write_text(source,encoding='utf-8',newline='\n')
+manifest={'dispatch':'static-table-cache-v1','protocol':'th04-rollback/3','adapter':'np21-rollback-v2',
           'tick_hz':60,'audio_hz':44100,'epoch':946684800000,
           'source_js_sha256':hashlib.sha256((VENDOR/'np21.js').read_bytes()).hexdigest(),
           'wasm_sha256':rollback_wasm['sha256'], 'rollback_wasm':rollback_wasm,
           'generated_js_sha256':hashlib.sha256(source.encode()).hexdigest()}
+manifest['presentation_sha256']=hashlib.sha256((ROOT/'web/frame-limit.js').read_bytes()).hexdigest()
 manifest['clock_sha256']=hashlib.sha256((ROOT/'web/netplay/np2-clock.js').read_bytes()).hexdigest()
 manifest['audio_output_sha256']=hashlib.sha256((ROOT/'web/netplay/audio-output.js').read_bytes()).hexdigest()
 manifest['rollback_queue_sha256']=hashlib.sha256((ROOT/'web/netplay/rollback-queue.js').read_bytes()).hexdigest()
 manifest['native_snapshots_sha256']=hashlib.sha256((ROOT/'web/netplay/native-snapshots.js').read_bytes()).hexdigest()
-manifest['game_adapter_sha256']=hashlib.sha256((ROOT/'web/netplay/runtime.js').read_bytes()).hexdigest()
-manifest['room_sha256']=hashlib.sha256((ROOT/'web/netplay/room.js').read_bytes()+(ROOT/'web/netplay/connection.js').read_bytes()+(ROOT/'web/netplay/relay.js').read_bytes()+(ROOT/'web/netplay/udp-config.js').read_bytes()+(ROOT/'web/lan.js').read_bytes()).hexdigest()
+manifest['game_adapter_sha256']=hashlib.sha256((ROOT/'web/netplay/runtime.js').read_bytes()+(ROOT/'web/netplay/personal-hud.js').read_bytes()+(ROOT/'web/netplay/hud-digits.js').read_bytes()).hexdigest()
+manifest['room_sha256']=hashlib.sha256((ROOT/'web/netplay/room.js').read_bytes()+(ROOT/'web/netplay/connection.js').read_bytes()+(ROOT/'web/netplay/relay.js').read_bytes()+(ROOT/'web/netplay/udp-config.js').read_bytes()+(ROOT/'web/lan.js').read_bytes()+(ROOT/'web/netplay/network-mode.js').read_bytes()).hexdigest()
 manifest['membership_sha256']=hashlib.sha256((ROOT/'web/netplay/membership.js').read_bytes()).hexdigest()
 manifest['startup_sha256']=hashlib.sha256((ROOT/'web/netplay/runtime.html').read_bytes()+(ROOT/'web/netplay/sha256.js').read_bytes()).hexdigest()
-manifest['controls_sha256']=hashlib.sha256((ROOT/'web/netplay/controls.js').read_bytes()+(ROOT/'web/control-settings.js').read_bytes()).hexdigest()
+manifest['controls_sha256']=hashlib.sha256((ROOT/'web/netplay/controls.js').read_bytes()+(ROOT/'web/control-settings.js').read_bytes()+(ROOT/'web/focus-settings.js').read_bytes()+(ROOT/'web/player-ui.js').read_bytes()+(ROOT/'web/player-ui.css').read_bytes()+(ROOT/'web/touch-layout.js').read_bytes()+(ROOT/'web/touch-input.js').read_bytes()+(ROOT/'web/native-touch.js').read_bytes()).hexdigest()
 manifest['pause_sha256']=hashlib.sha256((ROOT/'web/netplay/pause.js').read_bytes()).hexdigest()
 manifest['native_sound']=native_sound_config(ROOT)
 (ROOT/'web/netplay/runtime.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
 print('Built web/vendor/np2/np21-lockstep.js (no runtime tests executed)')
+

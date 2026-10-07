@@ -1,10 +1,11 @@
 // Manual, two-device probe. No emulator, game loop or rollback modules imported.
 // Uses the existing lobby API, but a distinct DataChannel label/wire handshake.
-import {countIceCandidate,describeIceCandidates,recordIceServerError,refreshRtcPath} from './connection.js';
-const PROTOCOL='th04-rollback/2',LABEL='th04-connection-check-v1';
+import {countIceCandidate,describeIceCandidates,describeIceAddresses,describeRtcConfiguration,recordIceServerError,refreshRtcPath} from './connection.js';
+const PROTOCOL='th04-rollback/3',LABEL='th04-connection-check-v1';
 const $=id=>document.getElementById(id);
 let session,peer,channel,busy=false,stopped=false,pollTimer,deadline,heartbeat;
 let localSlot;
+let rtcConfig,mode;
 let lobbyState=null,stage='检测程序已加载，请创建或加入检测房间',pollCount=0,lastPoll=0,lobbyWaitAt=0;
 function progress(message){stage=message;$('status').textContent=message;if(!peer)render();}
 let signalChain=Promise.resolve(),beganAt=0,pings=new Map(),sent=0,received=0,rtt=null,lastPong=0;
@@ -14,7 +15,7 @@ function render(){
   if(!peer){
     const seat=slot=>Number.isInteger(slot)?`P${slot+1}`:'未选座';
     const row=role=>`${role==='host'?'房主':'客机'}：${lobbyState.present[role]?'已加入':'未加入'} / ${seat(lobbyState.slots[role])} / ${lobbyState.ready[role]?'已准备':'未准备'}`;
-    $('diagnostics').textContent=`诊断版 2 · ${stage}\n`
+    $('diagnostics').textContent=`诊断版 3 · ${stage}\n`
       +`本机：${session?`${session.role==='host'?'房主':'客机'} / ${seat(localSlot)}`:'尚未加入房间'}\n`
       +(lobbyState?`房间阶段：${lobbyState.phase}\n${row('host')}\n${row('guest')}\n`:'')
       +`房间查询成功 ${pollCount} 次${lastPoll?' / 最近 '+new Date(lastPoll).toLocaleTimeString():''}\n`
@@ -22,13 +23,15 @@ function render(){
     return;
   }
   const pc=peer.pc;
-  $('diagnostics').textContent=`身份：${session.role==='host'?'房主／连接发起端':'客机／连接应答端'} · 座位 P${localSlot+1}\n浏览器：${navigator.userAgent}\n`
-    +`未配置 STUN/TURN（局域网默认） · 已用 ${Math.floor((performance.now()-beganAt)/1000)} 秒\n`
+  $('diagnostics').textContent=`诊断版 3 · 身份：${session.role==='host'?'房主／连接发起端':'客机／连接应答端'} · 座位 P${localSlot+1}\n浏览器：${navigator.userAgent}\n`
+    +`${describeRtcConfiguration(rtcConfig)} · 已用 ${Math.floor((performance.now()-beganAt)/1000)} 秒\n`
     +`连接 ${pc.connectionState} / ICE ${pc.iceConnectionState} / 协商 ${pc.signalingState} / 候选收集 ${pc.iceGatheringState}\n`
     +`数据通道 ${channel?.readyState||'未建立'} · ${peer.path||'路径待确认'}\n`
     +`本机：${describeIceCandidates(peer.localCandidateTypes)}\n收到：${describeIceCandidates(peer.remoteCandidateTypes)}\n`
+    +`本机地址类别：${describeIceAddresses(peer.localCandidateTypes)}\n收到地址类别：${describeIceAddresses(peer.remoteCandidateTypes)}\n`
     +`候选提交 ${peer.applied||0} · 服务错误：${peer.iceServerErrors.join('；')||'未报告'}\n`
-    +`发送探测 ${sent} / 收到回包 ${received} / 最近往返 ${rtt===null?'—':rtt.toFixed(1)+' ms'}\n`
+    +`${peer.iceDiagnostics||'ICE 探测统计尚未获取'}\n`
+    +`数据通道发送探测 ${sent} / 收到回包 ${received} / 最近往返 ${rtt===null?'—':rtt.toFixed(1)+' ms'}\n`
     +`候选提示：${peer.warning||'无'}`;
 }
 function leave(){
@@ -77,6 +80,7 @@ function submit(candidate){
 }
 async function description(message){
   const pc=peer.pc;
+  if(message.mode!==mode)throw Error('双方检测模式或页面版本不同，请刷新并选择相同模式后重建房间');
   if(!['offer','answer'].includes(message.type)||message.description?.type!==message.type)throw Error('无效检测信令');
   if((message.type==='offer')!==(session.role==='guest')||pc.remoteDescription)throw Error('重复或不匹配的连接描述');
   await pc.setRemoteDescription(message.description);
@@ -84,7 +88,7 @@ async function description(message){
   for(const candidate of candidates.splice(0))submit(candidate);
   if(message.type==='offer'){
     await pc.setLocalDescription(await pc.createAnswer());
-    if(!stopped)await signal({type:'answer',description:pc.localDescription.toJSON()});
+    if(!stopped)await signal({type:'answer',mode,description:pc.localDescription.toJSON()});
   }
 }
 function dispatch(event){
@@ -97,7 +101,7 @@ function dispatch(event){
 }
 function begin(){
   beganAt=performance.now();
-  const pc=new RTCPeerConnection({iceServers:[],iceTransportPolicy:'all'});
+  const pc=new RTCPeerConnection(rtcConfig);
   peer={pc,localCandidateTypes:{},remoteCandidateTypes:{},iceServerErrors:[]};
   $('status').textContent='正在建立连接；此过程不加载 NP2 或游戏。';
   pc.onicecandidate=event=>{
@@ -113,13 +117,13 @@ function begin(){
     attach(pc.createDataChannel(LABEL,{ordered:true}));
     signalChain=Promise.resolve().then(async()=>{
       await pc.setLocalDescription(await pc.createOffer());
-      if(!stopped)await signal({type:'offer',description:pc.localDescription.toJSON()});
+      if(!stopped)await signal({type:'offer',mode,description:pc.localDescription.toJSON()});
     }).catch(fail);
   }
   heartbeat=setInterval(()=>{
     if(stopped)return;
     try{
-      void refreshRtcPath(peer);
+      void refreshRtcPath(peer).then(()=>{if(!stopped)render();});
       if(received&&performance.now()-lastPong>10000){stop('已连通后超过 10 秒没有回包');return;}
       if(channel?.readyState==='open'){
         const id=++sent;pings.set(id,performance.now());
@@ -163,12 +167,14 @@ async function poll(){
 }
 async function enter(action){
   if(busy||session||stopped)return;
-  busy=true;$('create').disabled=$('join').disabled=$('seat').disabled=true;
+  busy=true;$('create').disabled=$('join').disabled=$('seat').disabled=$('mode').disabled=true;
+  mode=$('mode').value;
+  rtcConfig={iceServers:mode==='stun'?[{urls:'stun:stun.cloudflare.com:3478'}]:[],iceTransportPolicy:'all'};
   progress(action==='create'?'正在创建检测房间':'正在提交加入请求');
   try{
     if(typeof RTCPeerConnection!=='function')throw Error('此浏览器不支持 WebRTC');
     const room=$('room').value.trim().toUpperCase();
-    if(action==='join'&&!/^[0-9A-F]{6}$/.test(room))throw Error('请输入建房端显示的六位检测房间码');
+    if(action==='join'&&!/^[0-9]{4}$/.test(room))throw Error('请输入建房端显示的四位数字检测房间号');
     const result=await request(action,action==='join'?{room}:{});
     session={room:result.room,token:result.token,role:result.role};
     lobbyState=result.state;
@@ -191,5 +197,5 @@ window.addEventListener('unhandledrejection',event=>pageWarning(event.reason?.st
 window.addEventListener('pagehide',()=>{stopped=true;clearTimeout(pollTimer);clearTimeout(deadline);clearInterval(heartbeat);channel?.close();peer?.pc.close();leave();});
 $('create').onclick=()=>enter('create');$('join').onclick=()=>enter('join');
 $('reset').onclick=()=>location.reload();
-progress('检测程序已加载（诊断版 2）。请创建或加入检测房间');
+progress('检测程序已加载（诊断版 3）。请创建或加入检测房间');
 $('create').disabled=$('join').disabled=false;

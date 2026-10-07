@@ -48,7 +48,7 @@ export const udpConfig={
 接口接收 JSON：
 
 ```json
-{"room":"ABCD","token":"短期房间令牌","role":"guest"}
+{"room":"0037","token":"短期房间令牌","role":"guest"}
 ```
 
 接口返回浏览器标准 RTC 配置：

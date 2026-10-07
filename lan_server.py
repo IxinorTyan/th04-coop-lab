@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from turn_service import credentials as turn_credentials, TurnError
 
-PROTOCOL='th04-rollback/2'
+PROTOCOL='th04-rollback/3'
 ROLES=('host','guest','guest2')
 ROOMS={}
 LOCK=threading.Lock()
@@ -116,9 +116,9 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.reply({'error':'请刷新帧同步版网页'},400)
                 if len(ROOMS)>=64:
                     return self.reply({'error':'房间数量已满'},429)
-                code=secrets.token_hex(3).upper()
+                code=f'{secrets.randbelow(10000):04d}'
                 while code in ROOMS:
-                    code=secrets.token_hex(3).upper()
+                    code=f'{secrets.randbelow(10000):04d}'
                 token=secrets.token_urlsafe(24)
                 ROOMS[code]={'host':token,'guest':None,'guest2':None,'queues':{r:[] for r in ROLES},
                     'transport':transport,
@@ -127,6 +127,8 @@ class Handler(SimpleHTTPRequestHandler):
                     'settings':{'p1':0,'p2':2,'p3':0,'players':2,'difficulty':1,'lives':3,'bombs':2}}
                 return self.reply({'room':code,'token':token,'role':'host','protocol':PROTOCOL,'state':snapshot(ROOMS[code])})
             code=str(data.get('room','')).upper()
+            if len(code)!=4 or any(c not in '0123456789' for c in code):
+                return self.reply({'error':'请输入四位数字房间号'},400)
             room=ROOMS.get(code)
             if not room:
                 return self.reply({'error':'房间不存在或已结束，请重新建房'},404)
@@ -158,7 +160,7 @@ class Handler(SimpleHTTPRequestHandler):
                 room['queues'][role]=[]
                 startup={r:{'stage':v['stage'],'step':v['step'],'age':round(now-v['seen'],1)} for r,v in room.get('startup',{}).items()}
                 return self.reply({'events':events,'state':snapshot(room),'startup':startup})
-            if action in ('seat','settings','ready'):
+            if action in ('seat','loadout','settings','ready'):
                 if room['phase']!='lobby':
                     return self.reply({'error':'本局已经锁定，请结束后重新建房'},409)
                 if action=='seat':
@@ -169,16 +171,25 @@ class Handler(SimpleHTTPRequestHandler):
                         return self.reply({'error':'该座位已有人'},409)
                     room['slots'][role]=slot
                     room['ready']={r:False for r in ROLES}
+                elif action=='loadout':
+                    slot=room['slots'][role]
+                    value=data.get('loadout')
+                    if slot is None:
+                        return self.reply({'error':'请先选择座位，再选择自机'},409)
+                    if type(value) is not int or value not in range(4):
+                        return self.reply({'error':'自机选择无效'},400)
+                    room['settings'][f'p{slot+1}']=value
+                    room['ready']={r:False for r in ROLES}
                 elif action=='settings':
                     if role!='host':
                         return self.reply({'error':'只有房主可以修改本局设置'},403)
                     value=data.get('settings',{})
-                    bounds={'p1':(0,3),'p2':(0,3),'p3':(0,3),'players':(2,3),'difficulty':(0,4),'lives':(1,6),'bombs':(0,2)}
+                    bounds={'players':(2,3),'difficulty':(0,4),'lives':(1,6),'bombs':(0,2)}
                     if not isinstance(value,dict) or set(value)!=set(bounds) or any(type(value[k]) is not int or not lo<=value[k]<=hi for k,(lo,hi) in bounds.items()):
                         return self.reply({'error':'开局设置无效'},400)
                     if value['players']==2 and (room['guest2'] or 2 in room['slots'].values()):
                         return self.reply({'error':'请先让第三位加入者离开，并腾出 P3 座位，再关闭 3P'},409)
-                    room['settings']=value
+                    room['settings'].update(value)
                     room['ready']={r:False for r in ROLES}
                 else:
                     if room['slots'][role] is None:
@@ -251,7 +262,7 @@ if __name__=='__main__':
         server=server_type((bind,args.port),partial(Handler,directory=str(root)))
     except OSError as error:
         raise SystemExit(f'Cannot listen on port {args.port}. Close the previous LAN server window and try again. ({error})')
-    print('TH04 INPUT LOCKSTEP (not screen streaming)',flush=True)
+    print(f'TH04 INPUT LOCKSTEP (not screen streaming) · web root: {root}',flush=True)
     print(f'A computer: http://localhost:{args.port}/lan.html',flush=True)
     addresses=sorted({item[4][0] for item in socket.getaddrinfo(socket.gethostname(),None,socket.AF_INET) if not item[4][0].startswith('127.')})
     for address in addresses:

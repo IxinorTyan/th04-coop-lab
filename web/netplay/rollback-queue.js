@@ -1,9 +1,10 @@
-export const PROTOCOL='th04-rollback/2';
+import {MAX_INPUT} from '../touch-input.js';
+export const PROTOCOL='th04-rollback/3';
 export const TICK_MS=1000/60;
 export const BOOT_DELAY=2;
 export const MAX_ROLLBACK=12;
-export const VALID_INPUT=2047;
-const HELD=32|64,DIRECTIONS=15;
+export const VALID_INPUT=MAX_INPUT;
+const HELD=32|64|2048,DIRECTIONS=15;
 
 // confirmed is an exclusive contiguous prefix of authoritative inputs, not
 // the largest frame received. Prediction never advances it.
@@ -30,7 +31,8 @@ export class RollbackQueue {
   capture(buttons){
     const frame=this.frame+(this.active?this.inputDelay:BOOT_DELAY),lane=this.inputs[this.slot];
     if(lane.has(frame))return null;
-    const packet={type:'input',frame,slot:this.slot,buttons:buttons&VALID_INPUT};
+    if(!Number.isSafeInteger(buttons)||buttons<0||buttons>VALID_INPUT)throw Error('无效本机输入');
+    const packet={type:'input',frame,slot:this.slot,buttons};
     lane.set(frame,packet.buttons);this.updateConfirmed();return packet;
   }
   predicted(slot,frame){

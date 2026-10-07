@@ -49,6 +49,13 @@ export function countIceCandidate(counts,candidate){
   const parsed=typeof candidate?.candidate==='string'?candidate.candidate.match(/\btyp\s+(host|srflx|prflx|relay)\b/i)?.[1]?.toLowerCase():undefined;
   const type=['host','srflx','prflx','relay'].includes(candidate?.type)?candidate.type:parsed||'unknown';
   counts[type]=(counts[type]||0)+1;
+  const address=candidate?.address||candidate?.candidate?.trim().split(/\s+/)[4]||'';
+  const category=/\.local\.?$/i.test(address)?'mdns':/^\d{1,3}(\.\d{1,3}){3}$/.test(address)?'ipv4':address.includes(':')?'ipv6':'unreported';
+  counts[category]=(counts[category]||0)+1;
+}
+
+export function describeIceAddresses(counts){
+  return `mDNS ${counts.mdns||0} / IPv4 ${counts.ipv4||0} / IPv6 ${counts.ipv6||0} / 未识别 ${counts.unreported||0}`;
 }
 
 export function describeIceCandidates(counts){
@@ -89,7 +96,27 @@ export function describeRtcPath(stats){
 export async function refreshRtcPath(peer){
   if(peer.pathPending||peer.offline||peer.pc.connectionState==='closed')return;
   peer.pathPending=true;
-  try{peer.path=describeRtcPath(await peer.pc.getStats());}
-  catch{peer.path='路径统计暂不可用';}
+  try{
+    const stats=await peer.pc.getStats();
+    peer.path=describeRtcPath(stats);
+    peer.iceDiagnostics=describeIceChecks(stats);
+  }
+  catch{peer.path='路径统计暂不可用';peer.iceDiagnostics='ICE 探测统计暂不可用';}
   finally{peer.pathPending=false;}
+}
+
+// getStats may omit failed/unresolved pairs or individual counters. A missing
+// report is not evidence that a packet was never sent or mDNS resolution failed.
+export function describeIceChecks(stats){
+  const reports=[...stats.values()],pairs=reports.filter(r=>r.type==='candidate-pair');
+  const states=['frozen','waiting','in-progress','failed','succeeded'];
+  const summary=states.map(state=>`${state} ${pairs.filter(p=>p.state===state).length}`).join(' / ');
+  const counter=key=>{
+    const values=pairs.map(pair=>pair[key]).filter(Number.isFinite);
+    return values.length?`${values.reduce((a,b)=>a+b,0)}${values.length<pairs.length?'（部分）':''}`:'未提供';
+  };
+  const dtls=reports.filter(r=>r.type==='transport').map(r=>r.dtlsState).filter(Boolean);
+  return `候选对 ${pairs.length}${pairs.length?'：'+summary:'（浏览器未提供配对记录）'}\n`
+    +`ICE 探测请求 发 ${counter('requestsSent')} / 收 ${counter('requestsReceived')}；应答 发 ${counter('responsesSent')} / 收 ${counter('responsesReceived')}\n`
+    +`DTLS：${dtls.length?[...new Set(dtls)].join(' / '):'未提供'}（以上为浏览器公开统计，未提供不等于零）`;
 }

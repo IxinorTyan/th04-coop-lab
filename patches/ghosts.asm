@@ -285,7 +285,7 @@ ghosts_render:
     mov bx,bp
     shl bx,1
     movzx si,byte [cs:run_config+4+bx]
-    imul si,1408 ; 11 colors * 32 rows * 4 bytes
+    imul si,352 ; dictionary indices: 11 colors * 32 rows
     add si,ghost_masks
     mov ax,0xa800
     mov es,ax
@@ -306,9 +306,13 @@ ghosts_render:
     push di
     mov cx,32
 .row:
-    mov eax,[cs:si]
+    push bx
+    movzx bx,byte [cs:si]
+    shl bx,2
+    mov eax,[cs:ghost_rows+bx]
+    pop bx
     mov [es:di],eax ; GRCG RMW mask: zero bits preserve the background
-    add si,4
+    inc si
     add di,80
     cmp di,32000
     jb .nowrap
@@ -426,4 +430,5 @@ rescue_hud:
 rescue_title: db 'RESCUE',0
 
 ghost_rgb: incbin "patches/ghosts.bin",0,33
-ghost_masks: incbin "patches/ghosts.bin",33
+ghost_rows: incbin "build/ghost-rows.bin"
+ghost_masks: incbin "build/ghost-indices.bin"

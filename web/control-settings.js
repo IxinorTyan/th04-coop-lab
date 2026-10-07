@@ -5,7 +5,7 @@ const storageKey='th04.controls.v1';
 const primary={up:['ArrowUp'],down:['ArrowDown'],left:['ArrowLeft'],right:['ArrowRight'],bomb:['KeyX'],shot:['KeyZ'],focus:['ShiftLeft','ShiftRight'],pause:['Escape'],confirm:['Enter']};
 const secondary={up:['KeyW'],down:['KeyS'],left:['KeyA'],right:['KeyD'],bomb:['KeyL'],shot:['KeyJ'],focus:['KeyK'],pause:[],confirm:[]};
 const buttons={up:12,down:13,left:14,right:15,bomb:1,shot:0,focus:5,pause:9,confirm:-1};
-const defaults={local1:{keys:primary,pad:buttons},local2:{keys:secondary,pad:buttons},online:{keys:primary,pad:buttons}};
+const defaults={local1:{keys:primary,pad:buttons},local2:{keys:secondary,pad:buttons},online:{keys:primary,pad:buttons},solo:{keys:primary,pad:buttons}};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const validCode=code=>typeof code==='string'&&/^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Space|Enter|Escape|Tab|Backspace|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Insert|Delete|Home|End|PageUp|PageDown|Numpad[0-9]|Numpad(Add|Subtract|Multiply|Divide|Decimal|Enter)|F([1-9]|1[0-2]))$/.test(code);
 function validate(value){
@@ -40,18 +40,19 @@ export function padBits(pad,id='online',deadzone=.3){
 }
 export function isFormTarget(target){return !!target?.closest?.('input,select,textarea,button,[contenteditable="true"]');}
 export function keyLabel(code){return ({ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'左 Shift',ShiftRight:'右 Shift',ControlLeft:'左 Ctrl',ControlRight:'右 Ctrl',AltLeft:'左 Alt',AltRight:'右 Alt',Space:'空格',Escape:'Esc'})[code]||code.replace(/^Key|^Digit/,'');}
-export function controlsSummary(id){return actions.map(([a,label])=>`${label}：${profiles[id].keys[a].map(keyLabel).join(' / ')||'未绑定'}`).join(' · ');}
+export function controlsSummary(id){return actions.map(([a,label])=>`${id==='solo'&&a==='focus'?'低速':label}：${profiles[id].keys[a].map(keyLabel).join(' / ')||'未绑定'}`).join(' · ');}
 
-export function mountControlSettings(container,{local=false,onChange=()=>{},onEditing=()=>{}}={}){
+export function mountControlSettings(container,{local=false,solo=false,onChange=()=>{},onEditing=()=>{}}={}){
   const trigger=document.createElement('button');trigger.textContent='自定义操作';trigger.type='button';
   const dialog=document.createElement('dialog');dialog.className='control-dialog';
   dialog.innerHTML='<h2>自定义操作</h2><p>点击键位后按下新按键。Esc 取消录入；要绑定 Esc，请点「设为 Esc」。重复键位会提示冲突。</p><label>操作对象 <select class="profile"></select></label><div class="control-rows"></div><p>手柄左摇杆保持移动；按钮可修改。手柄用于本地 P2，联机时控制自己所选的座位。</p><p class="control-message" role="status" aria-live="polite"></p><div class="control-footer"><button type="button" class="reset">恢复当前默认</button><button type="button" class="save">保存</button><button type="button" class="cancel">取消</button></div><small>仅保存在当前浏览器及网址。游戏不会因打开设置自动暂停，请先暂停再修改。</small>';
+  if(solo)dialog.querySelectorAll('p')[1].textContent='键盘、手柄与触屏均控制单机玩家。手柄左摇杆保持移动；按钮可修改。';
   container.append(trigger,dialog);
   const select=dialog.querySelector('.profile'),rows=dialog.querySelector('.control-rows'),message=dialog.querySelector('.control-message');
-  for(const [id,label]of local?[['local1','本地 P1 · 键盘'],['local2','本地 P2 · 键盘 / 手柄']]:[['online','联机 · 当前玩家']])select.add(new Option(label,id));
+  for(const [id,label]of local?[['local1','本地 P1 · 键盘'],['local2','本地 P2 · 键盘 / 手柄']]:solo?[['solo','单机 · 键盘 / 手柄']]:[['online','联机 · 当前玩家']])select.add(new Option(label,id));
   let draft,pending=null;
   const conflict=(id,action,code)=>{
-    for(const profile of local?['local1','local2']:['online'])for(const [a,label]of actions)if((profile!==id||a!==action)&&draft[profile].keys[a].includes(code))return `${profile==='local1'?'本地 P1':profile==='local2'?'本地 P2':'当前玩家'}的「${label}」`;
+    for(const profile of local?['local1','local2']:[solo?'solo':'online'])for(const [a,label]of actions)if((profile!==id||a!==action)&&draft[profile].keys[a].includes(code))return `${profile==='local1'?'本地 P1':profile==='local2'?'本地 P2':'当前玩家'}的「${label}」`;
     return '';
   };
   function bind(action,code){
@@ -64,7 +65,7 @@ export function mountControlSettings(container,{local=false,onChange=()=>{},onEd
     const id=select.value;
     for(const [action,label]of actions){
       const row=document.createElement('div');row.className='control-row';
-      const name=document.createElement('span');name.textContent=label;
+      const name=document.createElement('span');name.textContent=solo&&action==='focus'?'低速':label;
       const key=document.createElement('button');key.type='button';key.textContent=pending===action?'请按新键…':draft[id].keys[action].map(keyLabel).join(' / ')||'未绑定';key.setAttribute('aria-label',`${label}键位`);
       key.onclick=()=>{pending=action;message.textContent='按下一个键（不支持组合快捷键），Esc 取消录入。';render();};
       const esc=document.createElement('button');esc.type='button';esc.textContent='设为 Esc';esc.onclick=()=>bind(action,'Escape');

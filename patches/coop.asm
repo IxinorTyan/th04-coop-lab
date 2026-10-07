@@ -33,6 +33,14 @@ dw guest_bank, scale_damage
 dw net_pause_enter, net_pause_sense, net_pause_wait, net_pause_state
 dw net_pause_delay_ptr, net_pause_sense_ptr, net_pause_wait_ptr
 dw offline_input_hook, offline_mask, offline_sense_ptr
+dw focus_visible_mask
+dw personal_stats, stats_frame, stats_active_add, stats_world_add, stats_clear_add
+dw stats_clear_big, stats_clear_small, stats_kill_add, stats_bit_add, stats_cross_add
+dw stats_stage_bonus, stats_allclear_bonus, stats_damage_reset, stats_shot_hit
+dw stats_bomb_hit, stats_laser_hit, stats_damage_finish
+dw personal_bonus
+dw touch_move, touch_state
+dw touch_status
 
 init_hook:
     call ORIGINAL(0xb1d0)
@@ -88,6 +96,14 @@ init_hook:
     mov cx,68
     rep stosb
     call init_third
+    call stats_stage_reset
+    mov dword [cs:touch_status],0
+    mov dword [cs:touch_state],0
+    mov dword [cs:touch_state+4],0
+    mov dword [cs:touch_state+8],0
+    mov dword [cs:touch_state+12],0
+    mov dword [cs:touch_state+16],0
+    mov dword [cs:touch_state+20],0
     inc word [cs:stage_generation]
     xor eax,eax
     call rescue_reset
@@ -139,6 +155,7 @@ swap_bytes:
     ret
 
 update_hook:
+    call touch_discard_blocked
     cmp byte [cs:resources+R_OUT],0
     jne .p1_out
     call ORIGINAL(0x10abf)
@@ -172,6 +189,7 @@ update_hook:
     mov bx,update_guest
     call for_guests
     call coop_tick
+    call touch_publish_status
     pop es
     popad
     ret
@@ -286,6 +304,7 @@ render_hook:
     call resource_store
     call hud_render
     call rescue_hud
+    call focus_points_render
     ret
 render_guest:
     call guest_out
@@ -412,18 +431,16 @@ p2_collision:
 ; Match original MAIN 1CAA9..1CAC5: 999 cap, shared HUD and rank-specific
 ; score_delta. Do not touch P1's bullet spawn/graze state.
 p2_graze_award:
-    cmp word [0xbcbc],999
-    jae .ret
     pushad
-    push es
-    inc word [0xbcbc]
-    push cs
-    call ORIGINAL(0xf091) ; original far hud_graze_put()
+    movzx bx,byte [cs:guest_slot]
+    imul si,bx,20
+    cmp word [cs:personal_stats+si+12],999
+    jae .ret
+    inc word [cs:personal_stats+si+12]
     movzx eax,word [0xbcbe]
-    add [0x435a],eax
-    pop es
-    popad
+    call stats_add
 .ret:
+    popad
     ret
 
 ; AX/DX are the item's updated position. CF=1 collects exactly once.
@@ -532,6 +549,7 @@ resource_index:
 resource_store:
     pushad
     push es
+    call stats_store
     call resource_index
     cmp byte [cs:si+R_OUT],2
     je .done
@@ -553,6 +571,7 @@ resource_store:
 resource_load:
     pushad
     push es
+    call stats_load
     call resource_index
     mov ax,[cs:si+R_POWER]
     mov [0x4664],ax
@@ -608,6 +627,7 @@ seed_resources:
     mov eax,[cs:si+4]
     mov [cs:di+4],eax
     mov byte [cs:di+R_OUT],0
+    mov byte [cs:di+12],0
     mov eax,[cs:si+8]
     mov [cs:di+8],eax
 .next:
@@ -626,10 +646,18 @@ award_enter:
     je .ret
     call swap_player
 .ret:
+    call power_pickup_bonus
     retf
 award_leave:
     pushad
     push es
+    push si
+    call resource_index
+    cmp byte [0x4664],128
+    jb .fraction_done
+    mov byte [cs:si+12],0
+.fraction_done:
+    pop si
     les bx,[0xba86]
     cmp byte [es:bx+0x0b],100
     jbe .bomb_cap
@@ -789,6 +817,7 @@ retire_hook:
 
 restart_players:
     pushad
+    call stats_restart
     call rescue_reset
     mov word [0x2396],0
     call resource_store
@@ -894,7 +923,23 @@ hud_render:
     add al,'1'
     mov ah,[cs:hud_colors+bp]
     call hud_char
-    add di,12                  ; column 64: lives beside player name
+    add di,2                   ; column 59: actual player shot + A/B
+    push bx
+    mov bx,bp
+    shl bx,1
+    mov ax,28                  ; Reimu's original main shot
+    cmp byte [cs:run_config+4+bx],0
+    je .character
+    mov ax,34                  ; Marisa's original star shot
+.character:
+    push ax
+    call hud_icon
+    mov al,[cs:run_config+5+bx]
+    add al,'A'
+    mov ah,[cs:hud_colors+bp]
+    call hud_char
+    pop bx
+    add di,4                   ; column 64: lives beside player name
     push word 49               ; PAT_ITEM + IT_1UP
     call hud_icon
     add di,2
@@ -1304,6 +1349,9 @@ laser_damage:
     cmp ax,[bp-10]
     ja .next
     add di,3
+    movzx bx,byte [cs:guest_slot]
+    shl bx,1
+    add word [cs:hit_weights+bx],3
 .next:
     add dx,48*16
     loop .beam
@@ -1419,3 +1467,6 @@ bullet_ages: times 440 db 0
 %include "patches/three-player.asm"
 %include "patches/native-pause.asm"
 %include "patches/offline.asm"
+%include "patches/quality-of-life.asm"
+%include "patches/personal-stats.asm"
+%include "patches/touch.asm"

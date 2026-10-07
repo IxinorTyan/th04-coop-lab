@@ -1,4 +1,5 @@
 // Pure construction of a common boundary; no wall clock enters simulation.
+import {MAX_INPUT} from '../touch-input.js';
 export function mergeDeparture(reports,slots,players){
   if(!reports.length)throw Error('缺少在线玩家状态');
   for(const r of reports){
@@ -13,7 +14,7 @@ export function mergeDeparture(reports,slots,players){
     for(const entry of r.inputs[slot]){
       if(!Array.isArray(entry)||entry.length!==2)throw Error('无效离线输入');
       const [at,bits]=entry;
-      if(!Number.isSafeInteger(at)||at<0||at>r.frame+120||!Number.isInteger(bits)||bits<0||bits>2047)throw Error('离线输入越界');
+      if(!Number.isSafeInteger(at)||at<0||at>r.frame+120||!Number.isSafeInteger(bits)||bits<0||bits>MAX_INPUT)throw Error('离线输入越界');
       if(at<start)continue;
       const lane=lanes[slot];
       if(lane.has(at)&&lane.get(at)!==bits)throw Error('在线玩家保存的输入互相冲突');

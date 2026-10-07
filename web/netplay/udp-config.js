@@ -3,7 +3,7 @@
 // returning {iceServers, iceTransportPolicy} with short-lived TURN credentials.
 export const udpConfig={
   credentialEndpoint:'',
-  iceServers:[],
+  iceServers:[{urls:'stun:stun.cloudflare.com:3478'}],
   iceTransportPolicy:'all'
 };
 

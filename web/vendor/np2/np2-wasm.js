@@ -217,7 +217,7 @@ class NP2 {
 }
 export class NP21 extends NP2 {
     static async create(config) {
-        const factory = (await import(config.lockstep ? './np21-lockstep.js' : './np21.js')).default;
+        const factory = (await import(config.lockstep ? './np21-lockstep.js' : './np21-60.js')).default;
         return new Promise((resolve, reject) => {
             new NP21(applyDefaultConfig(config), factory, resolve, reject);
         });

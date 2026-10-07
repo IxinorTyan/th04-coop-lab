@@ -1,32 +1,55 @@
-# Local build products, backups, extracted originals and reference checkouts.
+# Local builds, original disks, extracted files and reference checkouts.
 /build/
 /baseline/
 /extracted/
 /reference/
 /vendor-source/
 
-# start-lan.bat runs this builder and its two local imports at startup.
-# Keep these even when distributing the already-built game.
+# Keep required builders and their local imports: start-lan.bat invokes these.
+# Other research utilities and downloaded tool binaries stay local by default.
 /tools/*
+!/tools/build_lab.py
+!/tools/audit_assets.py
+!/tools/build_solo.py
+!/tools/build_frame_runtime.py
+!/tools/optimize_np21_dispatch.py
 !/tools/build_lockstep_runtime.py
 !/tools/build_rollback_wasm.py
 !/tools/lan_sound_config.py
 
-# Generated research inventories, memory dumps and old build reports.
-# Keep Markdown development notes for future maintainers.
+# Current solo, touch, frame pacing and rollback verification sources.
+# Screenshots, profiles and other generated outputs belong under reports/.
+!/tools/test_solo_cpu.py
+!/tools/test_solo_browser.cjs
+!/tools/test_touch_input.mjs
+!/tools/test_touch_browser.cjs
+!/tools/test_frame_limit.mjs
+!/tools/test_np21_dispatch.mjs
+!/tools/test_dispatch_browser.cjs
+!/tools/test_rollback_queue.mjs
+!/tools/test_native_snapshots.mjs
+!/tools/profile_solo_browser.cjs
+!/tools/audit_np21_table.cjs
+
+# Keep human-readable development evidence and archived documentation.
 /reports/*
 !/reports/*.md
 
-# Retired TSR music disk and retired transport implementation.
+# Retired music disk and transport implementation, not current runtime assets.
 /web/th04-local-music.hdi.gz
 /web/local-music-disk.json
 /web/local-music-patch.json
 /web/netplay/frame-queue.js
 /web/netplay/input-wire.js
 
-# Interpreter/editor/system caches and local configuration.
+# Generated test-runner output and local caches.
+/playwright-report/
+/test-results/
+/coverage/
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.ruff_cache/
 .venv/
 venv/
 node_modules/
@@ -38,15 +61,16 @@ Desktop.ini
 *.log
 *.tmp
 *.swp
-.env
-# Local TURN credentials and ephemeral Quick Tunnel address (not source).
+
+# Machine-specific credentials/configuration and temporary public tunnel URL.
 /turn-config.local.json
 /public-test-url.txt
+.env
 .env.*
 !.env.example
 
-# Intentionally keep web/vendor (including licenses), web/bgm, the playable
-# web/th04-coop.hdi.gz, web JSON manifests, patch sources/assets and docs.
-# These generated web artifacts are the runnable distribution, not build trash.
-# Keep root relay_server.py, turn_service.py, public_tunnel.py, configure_turn.py,
-# launchers and requirements-relay.txt: they are runtime/launch dependencies.
+# Intentionally keep runnable distribution assets, including generated files:
+# web/th04-coop.hdi.gz, web/th04-solo.hdi.gz, web/bgm/, web/assets/,
+# web/vendor/ (JS/WASM/fonts/licenses), and all current web JSON manifests.
+# Keep patches (including required binary assets), servers, launchers,
+# requirements-relay.txt, and documentation. Avoid blanket *.gz/*.wasm/*.bin rules.

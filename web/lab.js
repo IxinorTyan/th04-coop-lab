@@ -1,14 +1,24 @@
+import {startFrameLoop} from './frame-limit.js';
+import {mountPlayer} from './player-ui.js';
+import {writeNativeTouch,touchPlayer} from './native-touch.js';
+import {sha256} from './netplay/sha256.js';
 import {NP21} from './vendor/np2/np2-wasm.js';
+import {mountFocusSettings} from './focus-settings.js';
 import {encodeConfig,installConfig} from './launch-config.js';
 import {mountControlSettings,keyboardBits,padBits,isBound,isFormTarget,controlsSummary,syntheticInputEvents} from './control-settings.js';
 const $=id=>document.getElementById(id);
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
-let emulator, mailbox=-1, candidates=[], lastScan=0, lastTick=-1, lastTickAt=0;
+let emulator, mailbox=-1, candidates=[], scanCursor=0, lastDiagnostics=-Infinity, lastPadLabel=null, lastPadList=-Infinity, lastTick=-1, lastTickAt=0;
 let keyboard=new Set(), testInput=null, testing=false, padMenu=0, pageFocused=true,oldP1=0;
 let launchSettings=null, launchStarted=0, stageAnnounced=false;
+let nativePatch;
+const screen=$('screen'),playerHost=document.createElement('div');screen.before(playerHost);
+const player=mountPlayer(playerHost,{onGesture:async()=>{const context=emulator?.module.SDL2?.audioContext;if(context)await context.resume();}});
+player.stage.append(screen);player.setLabel('本地触屏控制 P1');
+const focusSettings=mountFocusSettings($('control-settings'),{local:true,alwaysPointControl:player.alwaysPointControl});
 const syntheticKeys=syntheticInputEvents;
 const nativeActions=[['ArrowUp',1],['ArrowDown',2],['ArrowLeft',4],['ArrowRight',8],['KeyX',16],['KeyZ',32],['ShiftLeft',64],['Escape',128],['Enter',256]];
-const status=text=>{$('status').textContent=text;};
+const status=text=>{$('status').textContent=text;player.note(text);player.diagnostics(text);};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function nativeKey(code,down){
   if(!emulator)return;
@@ -20,12 +30,12 @@ function nativeKey(code,down){
 async function tap(code){nativeKey(code,true);await sleep(110);nativeKey(code,false);$('canvas').focus();}
 for(const button of document.querySelectorAll('[data-key]'))button.onclick=()=>tap(button.dataset.key);
 function syncP1(){
-  let bits=keyboardBits(keyboard,'local1');
+  let bits=controlEditor.isEditing()?0:player.sample(keyboardBits(keyboard,'local1'));
   if((bits&3)===3)bits&=~3;if((bits&12)===12)bits&=~12;
   for(const [code,bit]of nativeActions)if((bits&bit)!==(oldP1&bit))nativeKey(code,!!(bits&bit));
   oldP1=bits;
 }
-function release(){keyboard.clear();syncP1();padMenu=0;if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
+function release(){player.reset();keyboard.clear();syncP1();padMenu=0;if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+22,mailbox+25);}
 function showControls(){
   $('controls-summary').textContent=`P1：${controlsSummary('local1')}。 P2：${controlsSummary('local2')}。`;
 }
@@ -58,16 +68,21 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)release();}
 $('canvas').addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 $('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();});
 
-function scan(now){
-  const heap=emulator.module.HEAPU8;
-  if(now-lastScan<1000)return;
-  lastScan=now;
-  candidates=[];
-  for(let at=heap.indexOf(signature[0]);at>=0;at=heap.indexOf(signature[0],at+1)){
-    if(at+675>=heap.length)continue;
-    if(signature.every((v,i)=>heap[at+i]===v))candidates.push(at);
+function scan(){
+  const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
+  // Known addresses are cheap to validate. Only search when they stop being
+  // active, and never traverse the whole heap in a single animation frame.
+  candidates=candidates.filter(at=>signature.every((v,i)=>heap[at+i]===v));
+  if(!candidates.some(at=>heap[at+25]===1&&v.getUint32(at+16,true)>0&&v.getUint16(at+20,true)>0)){
+    if(scanCursor>=heap.length)scanCursor=0;
+    const end=Math.min(scanCursor+1024*1024,heap.length);
+    const slice=heap.subarray(scanCursor,Math.min(end+signature.length-1,heap.length));
+    for(let offset=slice.indexOf(signature[0]);offset>=0&&scanCursor+offset<end;offset=slice.indexOf(signature[0],offset+1)){
+      const at=scanCursor+offset;
+      if(at+675<heap.length&&signature.every((v,i)=>heap[at+i]===v)&&!candidates.includes(at))candidates.push(at);
+    }
+    scanCursor=end;
   }
-  const v=new DataView(heap.buffer);
   const active=candidates.filter(at=>v.getUint32(at+16,true)>0&&v.getUint16(at+20,true)>0&&heap[at+25]===1);
   if(active.length===1)mailbox=active[0];
   else if(!active.includes(mailbox))mailbox=-1;
@@ -93,13 +108,18 @@ function snapshot(){
     stageFrame:v.getUint16(m+40,true),p1Miss:heap[m+42],p1Inv:heap[m+43],
     p2Inv:heap[m+66],p2Miss:heap[m+72],input:v.getUint16(m+22,true)};
 }
-function gamepadInput(){
+function gamepadInput(now){
   let all=[];
   try{all=Array.from(navigator.getGamepads?.()||[]).filter(p=>p?.connected);}catch{}
-  const select=$('pad-select'),known=new Set([...select.options].map(o=>o.value));
-  for(const pad of all)if(!known.has(String(pad.index))){const o=document.createElement('option');o.value=pad.index;o.textContent=`${pad.index+1} · ${pad.id}`;select.append(o);}
+  const select=$('pad-select');
+  if(now-lastPadList>=250){
+    lastPadList=now;
+    const known=new Set([...select.options].map(o=>o.value));
+    for(const pad of all)if(!known.has(String(pad.index))){const o=document.createElement('option');o.value=pad.index;o.textContent=`${pad.index+1} · ${pad.id}`;select.append(o);}
+  }
   const pad=select.value==='auto'?all[0]:all.find(p=>String(p.index)===select.value);
-  $('pad').textContent=pad?`${pad.id}${pad.mapping==='standard'?'':'（非标准映射，请核对按钮）'}`:'未检测到手柄：连接后按一下手柄按钮。';
+  const padLabel=pad?`${pad.id}${pad.mapping==='standard'?'':'（非标准映射，请核对按钮）'}`:'未检测到手柄：连接后按一下手柄按钮。';
+  if(padLabel!==lastPadLabel){$('pad').textContent=padLabel;lastPadLabel=padLabel;}
   if(!pageFocused||document.hidden||controlEditor.isEditing()){padMenu=0;return {bits:0,focus:0};}
   const value=padBits(pad,'local2',.25)|keyboardBits(keyboard,'local2');
   if(value&128&&!(padMenu&128))tap('Escape');
@@ -109,10 +129,16 @@ function gamepadInput(){
 }
 function tick(now){
   try{
-    const pad=gamepadInput();
+    const pad=gamepadInput(now);
     if(emulator){
-      scan(now);
-      let s=snapshot();
+      scan();
+      const nativePaused=mailbox>=0&&!!emulator.module.HEAPU8[mailbox-nativePatch.mailbox_cs_offset+nativePatch.native_pause_cs_offset+3];
+      const play=emulator.state==='running'&&!controlEditor.isEditing()&&!nativePaused;
+      const s=snapshot();
+      if(mailbox>=0){const p=touchPlayer(emulator.module.HEAPU8,mailbox,nativePatch,0);player.setContext({key:`${s?.stage}:${play?'game':'menu'}`,play:play&&!p.miss&&!p.entry&&!p.out});}
+      syncP1();
+      if(nativePatch)writeNativeTouch(emulator.module.HEAPU8,mailbox,nativePatch,[player.pack(oldP1)],!play);
+      player.consume();
       if(s){
         if(!stageAnnounced){stageAnnounced=true;status(`已进入关卡 · P1 ${$('loadout-p1').selectedOptions[0].textContent} / P2 ${$('loadout-p2').selectedOptions[0].textContent}`);}
         if(s.ticks!==lastTick){lastTick=s.ticks;lastTickAt=now;}
@@ -124,8 +150,12 @@ function tick(now){
         if((bits&3)===3)bits&=~3;if((bits&12)===12)bits&=~12;
         const heap=emulator.module.HEAPU8,v=new DataView(heap.buffer);
         v.setUint16(mailbox+22,bits,true);heap[mailbox+24]=focus;
-        $('diagnostics').textContent=`游戏帧 ${s.ticks} · 关卡帧 ${s.stageFrame} · ${live?'运行中':'暂停 / 非关卡状态'}\nP1 (${s.p1.map(n=>n.toFixed(1)).join(', ')}) 受击动画 ${s.p1Miss}\nP2 (${s.p2.map(n=>n.toFixed(1)).join(', ')}) 无敌 ${s.p2Inv} 受击动画 ${s.p2Miss}\nP2 射击调用 ${s.shots} · 子弹命中 ${s.shotHits} · 碰撞受击 ${s.hits}\nP2 拾取 ${s.items} · 瞄准 / 吸引选择 P2 ${s.targets}\nP2 输入 0x${bits.toString(16)} · ${focus?'低速':'通常速度'}\n手柄输入与 P1 的 SDL 输入已隔离。`;
-        $('diagnostics').textContent+='\n'+s.players.map(p=>`P${p.id} · POWER ${(Math.floor(p.power*100/32)/100).toFixed(2)} · LIFE ${p.lives} · BOMB ${p.bombs}${p.out?' · 已退场':''}`).join('\n');
+        heap[mailbox-nativePatch.mailbox_cs_offset+nativePatch.focus_visible_mask_cs_offset]=focusSettings()|(player.alwaysPoint()?8:0);
+        if($('diagnostics').closest('details').open&&now-lastDiagnostics>=250){
+          lastDiagnostics=now;
+          $('diagnostics').textContent=`游戏帧 ${s.ticks} · 关卡帧 ${s.stageFrame} · ${live?'运行中':'暂停 / 非关卡状态'}\nP1 (${s.p1.map(n=>n.toFixed(1)).join(', ')}) 受击动画 ${s.p1Miss}\nP2 (${s.p2.map(n=>n.toFixed(1)).join(', ')}) 无敌 ${s.p2Inv} 受击动画 ${s.p2Miss}\nP2 射击调用 ${s.shots} · 子弹命中 ${s.shotHits} · 碰撞受击 ${s.hits}\nP2 拾取 ${s.items} · 瞄准 / 吸引选择 P2 ${s.targets}\nP2 输入 0x${bits.toString(16)} · ${focus?'低速':'通常速度'}\n手柄输入与 P1 的 SDL 输入已隔离。`;
+          $('diagnostics').textContent+='\n'+s.players.map(p=>`P${p.id} · POWER ${(Math.floor(p.power*100/32)/100).toFixed(2)} · LIFE ${p.lives} · BOMB ${p.bombs}${p.out?' · 已退场':''}`).join('\n');
+        }
         for(const [id,xy,miss,index] of [['p1',s.p1,s.p1Miss,0],['p2',s.p2,s.p2Miss,1]]){
           $(id).hidden=!live||miss>0||s.players[index]?.out;
           $(id).style.left=`${(xy[0]+32)/640*100}%`;
@@ -136,11 +166,11 @@ function tick(now){
       if(!stageAnnounced&&launchStarted&&now-launchStarted>90000){status('加载时间较长，请查看游戏画面；可返回设置后重新开始。');launchStarted=0;}
     }
   }catch(e){$('diagnostics').textContent=`诊断错误：${e.message}`;}
-  requestAnimationFrame(tick);
 }
-requestAnimationFrame(tick);
+startFrameLoop(tick);
 
 $('start').onclick=async()=>{
+  player.enter();
   $('start').disabled=true;
   $('setup').disabled=true;
   try{
@@ -151,20 +181,21 @@ $('start').onclick=async()=>{
     if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     const meta=await (await fetch('disk.json',{cache:'no-store'})).json();
-    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),b=>b.toString(16).padStart(2,'0')).join('');
+    const hash=await sha256(data);
     if(hash!==meta.sha256||data.length!==meta.size)throw Error('实验磁盘校验失败');
     const patch=await (await fetch('patch.json',{cache:'no-store'})).json();
+    nativePatch=patch;
     installConfig(data,patch,config);
     emulator=await NP21.create({canvas:$('canvas'),clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'});
-    emulator.addDiskImage('th04-lab.hdi',data);emulator.setHdd(0,'th04-lab.hdi');emulator.run();
+    emulator.addDiskImage('th04-lab.hdi',data);emulator.setHdd(0,'th04-lab.hdi');emulator.run();player.setActive(true);
     $('canvas').focus();$('pause').disabled=false;$('restart').disabled=false;$('capture').disabled=false;
     launchStarted=performance.now();
     status('正在启动游戏并载入双方机体，请稍候…');
-  }catch(e){status(`启动失败：${e.message}`);console.error(e);$('restart').disabled=false;if(!emulator){$('start').disabled=false;$('setup').disabled=false;}}
+  }catch(e){player.setActive(false);player.exit();status(`启动失败：${e.message}`);console.error(e);$('restart').disabled=false;if(!emulator){$('start').disabled=false;$('setup').disabled=false;}}
 };
 $('pause').onclick=()=>{if(!emulator)return;if(emulator.state==='running'){release();emulator.pause();$('pause').textContent='继续模拟器';}else{emulator.run();$('pause').textContent='暂停模拟器';$('canvas').focus();}};
 $('restart').onclick=()=>location.reload();
-$('fullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('screen').requestFullscreen();
+$('fullscreen').onclick=()=>player.enter();
 $('capture').onclick=()=>{
   const c=document.createElement('canvas');c.width=640;c.height=400;
   c.getContext('2d').drawImage($('canvas'),0,0);
