@@ -1,23 +1,23 @@
 {
   "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
-  "patched_size": 167874,
+  "patched_size": 167890,
   "insert_image_offset": 78048,
-  "insert_size": 11616,
-  "payload_size": 11616,
-  "heap_bytes": 382112,
+  "insert_size": 11632,
+  "payload_size": 11628,
+  "heap_bytes": 382096,
   "payload_and_heap_bytes": 393728,
-  "payload_padding_bytes": 0,
+  "payload_padding_bytes": 4,
   "mailbox_cs_offset": 38008,
   "relocations_rebased": 1136,
   "native_pause_cs_offset": 43434,
   "offline_mask_cs_offset": 43559,
   "focus_visible_mask_cs_offset": 43745,
   "personal_stats": {
-    "cs_offset": 44021,
+    "cs_offset": 44033,
     "stride": 20,
     "players": 3,
-    "bonus_cs_offset": 44081,
+    "bonus_cs_offset": 44093,
     "score": 0,
     "high_score": 4,
     "point": 8,
@@ -57,9 +57,9 @@
   "loadout_file_offset": 88601,
   "bomb_owner_cs_offset": 39192,
   "entry_count": 79,
-  "touch_cs_offset": 45393,
+  "touch_cs_offset": 45405,
   "touch_stride": 8,
-  "touch_status_cs_offset": 45417,
+  "touch_status_cs_offset": 45429,
   "rescue_cs_offset": 39401,
   "p3_input_cs_offset": 42078,
   "p3_motion_cs_offset": 42081,
@@ -115,7 +115,7 @@
     {
       "image_offset": 68469,
       "original": "e8d8fd",
-      "target_cs_offset": 45604,
+      "target_cs_offset": 45616,
       "name": "synchronized direct touch velocity"
     },
     {
@@ -229,31 +229,31 @@
     {
       "image_offset": 67043,
       "original": "33ffc646f100",
-      "target_cs_offset": 44700,
+      "target_cs_offset": 44712,
       "name": "reset hit ownership"
     },
     {
       "image_offset": 67135,
       "original": "03f8fe064046",
-      "target_cs_offset": 44724,
+      "target_cs_offset": 44736,
       "name": "record shot damage owner"
     },
     {
       "image_offset": 67195,
       "original": "83c705803e5c1b00",
-      "target_cs_offset": 44762,
+      "target_cs_offset": 44774,
       "name": "record Bomb damage owner"
     },
     {
       "image_offset": 67252,
       "original": "83c703fe064046",
-      "target_cs_offset": 44787,
+      "target_cs_offset": 44799,
       "name": "record first P1 laser"
     },
     {
       "image_offset": 67300,
       "original": "83c703fe064046",
-      "target_cs_offset": 44787,
+      "target_cs_offset": 44799,
       "name": "record second P1 laser"
     },
     {
@@ -263,9 +263,9 @@
       "name": "render owner Bomb resources"
     }
   ],
-  "sha256": "c0c1678920b0f535b2c9dbcef9ce7b2549f0f9cda97974e2d8e24b39f6b510b0",
+  "sha256": "aa882324624d493b7f0d823f15d1371cb1585bd486a2eed9e8975fbae174d437",
   "code_segment": 2735,
-  "data_segment": 9226,
+  "data_segment": 9227,
   "launch_config": {
     "schema": 2,
     "defaults": [

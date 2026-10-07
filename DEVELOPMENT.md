@@ -236,3 +236,8 @@ python tools/build_lockstep_runtime.py
 房间 settings 增加严格布尔值 rollback，服务器创建房间时默认 rtc=true、ws=false；旧 URL rollback 参数仅作为房主新建房间的初值，客机 URL 不决定策略。只有房主可在 lobby 修改，修改后清空全员准备，loading 后服务器拒绝变更。客机开关由禁用的房主设置 fieldset 展示。beginGame 从锁定房间值生成 inputPolicy，hello 校验保持；RollbackQueue.arm 对 rollbackEnabled=false 直接拒绝。
 
 测试：真实服务端 handler 覆盖默认值、客机权限、非法布尔值、房主 P2、准备重置和开局锁定；双浏览器通过真实 HTTP 房间接口验证状态同步及客机相反 URL 不影响设置；队列测试验证关闭时不能预测或启用回滚。浏览器房间测试拦截了游戏 iframe，只验证大厅，不作为真实多端战斗测试。新增 tools/test_rollback_setting.py、tools/test_rollback_setting_browser.cjs（需 9887 房间 QA 服务）。更新后重启 start-lan.bat、所有玩家刷新并重建房间。
+
+
+## 2026-10-07 P1 分数异常封顶
+
+四个立即数加分点被错误接入 EAX 加分入口，旧 x86 补丁已复现一次奖励变为 99,999,999。build_lab.py 将这四点改接 entries 66/67/63/64 的已有专用入口，合作磁盘和联机指纹已重建；独立单机不改。发布磁盘的 144 次机器码调用测试通过。维护分值 hook 必须区分原指令的立即数/寄存器来源，不得统一替换成 stats_active_add；详见 reports/personal-score-2026-10-07.md 与 tools/test_fixed_score_cpu.py。

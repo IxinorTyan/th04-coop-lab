@@ -123,13 +123,15 @@ def build_exe():
     pause_pointer_relocs = [CS_BASE+entries[i]+2 for i in (51,52,53,56)]
     extra_relocs += pause_pointer_relocs
     # Audited exhaustive list of original score-delta additions.
-    # All score deltas are made in the currently bound player's context. The
-    # hooks run before the old shared accumulator and replace that write.
+    # Register-valued awards use EAX. Immediate-valued awards MUST use their
+    # constant-loading wrappers: EAX is unrelated at those sites and may cap
+    # the score at 99,999,999. Clear wrappers also retain Bomb/world ownership.
+    # Hooks replace the old shared accumulator write.
     score_sites={0x10708:(60,'6601065a43'),
-        0x16d37:(60,'6681065a4300140000'),0x17f6d:(60,'6601065a43'),
+        0x16d37:(66,'6681065a4300140000'),0x17f6d:(60,'6601065a43'),
         0x19f7f:(60,'6601065a43'),0x19fe9:(60,'6601065a43'),
-        0x1a201:(60,'6681065a43b80b0000'),
-        0x1c929:(60,'6683065a4364'),0x1c931:(60,'6683065a430a'),
+        0x1a201:(67,'6681065a43b80b0000'),
+        0x1c929:(63,'6683065a4364'),0x1c931:(64,'6683065a430a'),
         0x1cac0:(60,'6601065a43'),0x1cbc1:(60,'6601065a43'),
         0x1d801:(60,'6601065a43'),0x1da13:(60,'6601065a43'),
         0x1dda8:(60,'6601065a43')}

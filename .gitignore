@@ -20,6 +20,7 @@
 # Current solo, touch, frame pacing and rollback verification sources.
 # Screenshots, profiles and other generated outputs belong under reports/.
 !/tools/test_solo_cpu.py
+!/tools/test_fixed_score_cpu.py
 !/tools/test_solo_browser.cjs
 !/tools/test_touch_input.mjs
 !/tools/test_touch_browser.cjs

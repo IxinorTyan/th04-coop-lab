@@ -51,6 +51,8 @@
 
 具体规则和限制见 [开发交接](DEVELOPMENT.md)、[三人玩法](reports/three-player-design.md)、[原版暂停](reports/native-pause.md) 与 [掉线处理](reports/disconnection.md)。这些报告含历史实现细节，协议和资源版本以当前代码与生成清单为准。
 
+合作计分已修复固定奖励误读寄存器、导致 P1 分数突然封顶为全 9 的问题，详见 [计分修正记录](reports/personal-score-2026-10-07.md)。更新后需刷新并重开游戏。
+
 ## 帧率与性能
 
 单机、本地合作、联机统一使用 **60 Hz 画面更新上限**。原版游戏时钟及联机补步、回滚时序保持不变；设备性能不足时仍可能低于 60 FPS。
