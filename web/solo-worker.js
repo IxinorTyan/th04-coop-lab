@@ -1,0 +1,108 @@
+import {workerEnvironment} from './solo-worker-environment.js';
+
+let emulator,environment,bridge,music,game,patch,mailbox=-1,cursor=0;
+const seen=new Map(),signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
+let awaitingSnapshot=false,pendingMusic=[],lastPublish=0,costs=[],lastInput=performance.now(),held=new Map();
+let input={focus:0,points:0,touch:[0,0]},timer;
+function scan04(now){
+  const h=emulator.module.HEAPU8,v=new DataView(h.buffer);mailbox=-1;
+  for(const [at,candidate] of seen){
+    if(!signature.every((b,i)=>h[at+i]===b)){seen.delete(at);continue;}
+    const ticks=v.getUint32(at+16,true);
+    if(ticks!==candidate.ticks){candidate.ticks=ticks;candidate.changed=now;}
+    if((now-candidate.changed<200||h[at+22]===2)&&h[at+22]!==0)mailbox=at;
+  }
+  if(mailbox<0){
+    if(cursor>=h.length)cursor=0;
+    const end=Math.min(cursor+1024*1024,h.length),slice=h.subarray(cursor,Math.min(end+35,h.length));
+    for(let i=slice.indexOf(signature[0]);i>=0&&cursor+i<end;i=slice.indexOf(signature[0],i+1)){
+      const at=cursor+i;
+      if(at+36<=h.length&&signature.every((b,j)=>h[at+j]===b)&&v.getUint32(at+16,true)&&v.getUint16(at+20,true)&&!seen.has(at))seen.set(at,{ticks:0,changed:-Infinity});
+    }
+    cursor=end;
+  }
+  if(mailbox<0)return null;
+  const at=mailbox,data=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
+  return {at,mode:h[at+22],flags:h[at+23],generation:v.getUint16(at+24,true),ticks:v.getUint32(at+16,true),pointOptions:h[at+26],
+    x:v.getInt16(data+0x464e,true)/16,y:v.getInt16(data+0x4650,true)/16,stage:h[data+0x5394],focus:h[data+0x3976],touchFlags:v.getUint16(at+28,true)};
+}
+function clear(){
+  for(const event of held.values())environment.key({...event,type:'keyup'});
+  held.clear();input={focus:0,points:0,touch:[0,0]};
+  if(bridge){bridge.setFocus(0,0);bridge.setTouch([0,0]);}
+  if(mailbox>=0)emulator.module.HEAPU8.fill(0,mailbox+28,mailbox+36);
+}
+function update(){
+  if(!emulator)return;
+  const now=performance.now();
+  if(now-lastInput>750)clear();
+  const h=emulator.module.HEAPU8;
+  let state,markers=[];
+  if(bridge){state=bridge.update(now);markers=bridge.markers();if(state)state.ticks=new DataView(h.buffer).getUint32(state.at+patch.fields.ticks,true);}
+  else state=scan04(now);
+  pendingMusic.push(...(music?.read(h)||[]));
+  if(!awaitingSnapshot&&(now-lastPublish>=15||pendingMusic.length)){
+    lastPublish=now;awaitingSnapshot=true;const events=pendingMusic;pendingMusic=[];
+    postMessage({type:'snapshot',state,markers,events,costs,frames:emulator.module.localFrameCount||0,uploads:emulator.module.frameUploads||0});costs=[];
+  }
+}
+async function dispatch(message){
+  const {method,args=[]}=message;
+  if(method==='init'){
+    const setup=args[0];game=setup.game;patch=setup.patch;
+    environment=workerEnvironment(setup.canvas,setup.sampleRate);
+    const {NP21}=await import(game==='03'?'./vendor/np2/np2-original.js':'./vendor/np2/np2-wasm.js');
+    emulator=await NP21.create({...setup.config,canvas:setup.canvas,workerRuntime:true,nativeSoloAudio:false,
+      onDiskChange:()=>postMessage({type:'diskChange'}),onExit:()=>{clear();postMessage({type:'exit'});}});
+    if(game==='03'){
+      const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);
+    }
+    if(setup.music){const {NativeMusic}=await import(game==='03'?'./native-music.js':'./solo-native-music.js');music=new NativeMusic(setup.music);}
+    emulator.module.observeLocalFrame=cost=>{if(costs.length<120)costs.push(cost);};
+    timer=setInterval(update,16);
+    return {heapBytes:emulator.module.HEAPU8.length,runtime:emulator.module.mobileRuntime};
+  }
+  if(method==='snapshotAck'){awaitingSnapshot=false;return;}
+  if(method==='audio')return emulator.state==='running'?environment.audio():null;
+  if(method==='key'){
+    lastInput=performance.now();const event=args[0];
+    if(event.type==='keydown')held.set(event.code,event);else if(event.type==='keyup')held.delete(event.code);
+    environment.key(event);return;
+  }
+  if(method==='input'){
+    lastInput=performance.now();input=args[0];
+    if(bridge){
+      const h=emulator.module.HEAPU8;
+      if(!bridge.valid(h,bridge.live)||input.generation!==new DataView(h.buffer).getUint16(bridge.live+patch.fields.generation,true))return;
+      bridge.setFocus(input.focus,0);bridge.setTouch(input.touch||[0,0]);
+    }else if(mailbox>=0){
+      const h=emulator.module.HEAPU8,v=new DataView(h.buffer),at=mailbox;
+      if(input.generation!==v.getUint16(at+24,true))return;
+      h[at+26]=input.points||0;
+      const t=input.touch;
+      if(emulator.state==='running'&&h[at+22]===1&&!h[at+23]&&t?.active){
+        v.setUint16(at+28,t.unlimited?3:1,true);
+        for(const [offset,delta]of [[30,t.x],[32,t.y]])v.setInt16(at+offset,Math.max(-8192,Math.min(8191,v.getInt16(at+offset,true)+delta)),true);
+      }else h.fill(0,at+28,at+36);
+    }
+    return;
+  }
+  if(method==='clear'){clear();return;}
+  if(method==='pause'){clear();emulator.pause();return;}
+  if(method==='reset'){pendingMusic=[];clear();bridge?.reset();music?.reset();seen.clear();mailbox=-1;cursor=0;emulator.reset();return;}
+  if(method==='run'){lastInput=performance.now();emulator.run();return;}
+  if(method==='getDiskImage')return emulator.getDiskImage(...args);
+  if(method==='addDiskImage'){emulator.addDiskImage(...args);return;}
+  if(method==='setHdd'){emulator.setHdd(...args);return;}
+  throw Error('Unknown worker command: '+method);
+}
+// Requests arrive in order; serialize startup/disk operations as well as input.
+let queue=Promise.resolve();
+onmessage=({data})=>{queue=queue.then(async()=>{
+  try{
+    const result=await dispatch(data);
+    if(data.id){const transfer=Array.isArray(result)?result.map(channel=>channel.buffer):result instanceof Uint8Array?[result.buffer]:[];postMessage({type:'reply',id:data.id,result},transfer);}
+  }catch(error){postMessage({type:'error',id:data.id,message:error?.stack||String(error)});}
+});};
+addEventListener('error',event=>postMessage({type:'error',message:event.message}));
+addEventListener('unhandledrejection',event=>postMessage({type:'error',message:String(event.reason?.stack||event.reason)}));

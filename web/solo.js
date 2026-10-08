@@ -1,3 +1,5 @@
+import {WorkerNP21,workerAssistBridge,mountWorkerChoice} from './solo-worker-client.js';
+import {mountSoloView} from './solo-view.js';
 import {SoloMusic} from './solo-music.js';
 import {startFrameLoop} from './frame-limit.js';
 import {mountSoloPerformance} from './solo-performance.js';
@@ -11,6 +13,7 @@ import {unpackTouch} from './touch-input.js';
 import {sha256} from './netplay/sha256.js';
 const $=id=>document.getElementById(id);
 const audioMode=$('audio-mode');
+const runtimeMode=mountWorkerChoice(audioMode.closest('label').parentElement);
 let soloMusic;
 window.addEventListener('pagehide',event=>{if(event.persisted)soloMusic?.suspend();else soloMusic?.dispose();});
 window.addEventListener('pageshow',event=>{if(event.persisted)soloMusic?.resume();});
@@ -22,6 +25,7 @@ let emulator,patch,mailbox=-1,scanCursor=0,oldBits=0,focused=true,started=false,
 const keys=new Set(),seen=new Map();
 const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
 const player=mountPlayer($('game'),{solo:true,onGesture:async()=>{soloMusic?.resume();await emulator?.module.SDL2?.audioContext?.resume();}});
+mountSoloView($('game'));
 mountSoloPerformance({host:$('game'),game:'04',getEmulator:()=>emulator,readState:()=>{
   const s=readSoloState();return s?{playing:s.mode===1&&!s.flags,generation:s.generation,ticks:s.ticks}:null;
 }});
@@ -38,9 +42,10 @@ function nativeKey(code,down){
   syntheticInputEvents.add(event);canvas.dispatchEvent(event);
 }
 function send(bits){for(const [code,bit] of nativeActions)if((bits&bit)!==(oldBits&bit))nativeKey(code,!!(bits&bit));oldBits=bits;}
-function clearNative(at=mailbox){if(at>=0&&emulator){const h=emulator.module.HEAPU8;if(signature.every((v,i)=>h[at+i]===v))h.fill(0,at+28,at+36);}}
+function clearNative(at=mailbox){if(emulator?.isWorker){emulator.clearInput();return;}if(at>=0&&emulator){const h=emulator.module.HEAPU8;if(signature.every((v,i)=>h[at+i]===v))h.fill(0,at+28,at+36);}}
 function release(){menuBits=0;menuUntil=0;keys.clear();player.reset();send(0);clearNative();}
 function scan(now){
+  if(emulator.isWorker){mailbox=emulator.snapshot.state?.at??-1;return emulator.snapshot.state;}
   const h=emulator.module.HEAPU8,view=new DataView(h.buffer);
   const previous=mailbox;mailbox=-1;
   for(const [at,state] of seen){
@@ -70,7 +75,7 @@ function scan(now){
 }
 function tick(now){
   if(emulator?.state==='running'){
-    soloMusic?.poll(emulator.module.HEAPU8,now);
+    if(!emulator.isWorker)soloMusic?.poll(emulator.module.HEAPU8,now);
     const state=scan(now),game=state?.mode===1;
     const enabled=focused&&!document.hidden&&!editor.isEditing();
     player.setContext({key:`${mailbox}:${state?.generation||0}:${game?'game':'menu'}`,play:enabled&&game&&!state.flags});
@@ -88,7 +93,9 @@ function tick(now){
     }else{menuBits=0;menuUntil=0;}
     send(bits);
     const touch=unpackTouch(player.pack(bits));
-    if(mailbox>=0){
+    if(emulator.isWorker){
+      emulator.setInput({generation:state?.generation,points:(focus()?1:0)|(player.alwaysPoint()?8:0),touch:enabled&&game&&!state.flags?touch:null});
+    }else if(mailbox>=0){
       const h=emulator.module.HEAPU8,v=new DataView(h.buffer),at=mailbox+28;
       h[mailbox+26]=(focus()?1:0)|(player.alwaysPoint()?8:0);
       if(enabled&&game&&!state.flags&&touch.active){
@@ -118,7 +125,7 @@ document.addEventListener('focusin',e=>{if(isFormTarget(e.target))release();});
 canvas.onpointerdown=()=>canvas.focus();
 $('restart').onclick=()=>location.reload();
 $('start').onclick=async()=>{
-  if(started)return;started=true;$('start').disabled=true;audioMode.disabled=true;$('language').disabled=true;player.enter();
+  if(started)return;started=true;$('start').disabled=true;audioMode.disabled=true;runtimeMode.disabled=true;$('language').disabled=true;player.enter();
   const version=gameVersion($('language').value);
   const status=text=>{$('status').textContent=text;player.note(text);player.diagnostics(text);};
   try{
@@ -129,15 +136,18 @@ $('start').onclick=async()=>{
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     if(data.length!==patch.disk.size||await sha256(data)!==patch.disk.sha256)throw Error('单机磁盘校验失败');
     if(soloMusic)await soloMusic.install(data,'GENSO');
-    emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',no_mouse:true,use_menu:false,fontfile:'font.bmp'});
-    emulator.addDiskImage('th04-solo.hdi',data);emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();
+    const config={canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',no_mouse:true,use_menu:false,fontfile:'font.bmp'};
+    emulator=runtimeMode.value==='worker'?await WorkerNP21.create(config,{game:'04',patch,music:soloMusic?.reader.patch,onError:e=>{soloMusic?.suspend();player.exit();status('模拟线程停止：'+e.message);}}):await NP21.create(config);
+    if(emulator.isWorker)emulator.onMusic=(ax,hash)=>soloMusic?.player.command(ax,hash);
+    await emulator.addDiskImage('th04-solo.hdi',data);await emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();
     status(`${version.label}单机已启动，请等待开头，在游戏内选择模式与角色。`);$('restart').disabled=false;
-  }catch(e){soloMusic?.dispose();player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}
+  }catch(e){emulator?.dispose?.();soloMusic?.dispose();player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}
 };
 
 // Read-only diagnostics used by the standalone browser smoke test.
 export function readFrameStats(){return {limit:60,callbacks:emulator?.module.localFrameCount||0};}
 export function readSoloState(){
+  if(emulator?.isWorker)return emulator.snapshot.state;
   if(!emulator||mailbox<0)return null;
   const h=emulator.module.HEAPU8,v=new DataView(h.buffer);
   const data=mailbox-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
