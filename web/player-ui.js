@@ -6,7 +6,7 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
   // Keep styles outside the subtree replaced below, and resolve from this module
   // so local play and the netplay room use the same styles and geometry.
   for(const file of ['player-ui.css','touch-overlay.css']){
-    const href=new URL(file+'?v=20261007-touch3',import.meta.url).href;
+    const href=new URL(file+'?v=20261008-escape1',import.meta.url).href;
     if(![...document.querySelectorAll('link[rel="stylesheet"]')].some(link=>link.href===href))
       document.head.append(Object.assign(document.createElement('link'),{rel:'stylesheet',href}));
   }
@@ -44,20 +44,46 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
   let touchEnabled=matchMedia('(pointer:coarse)').matches;
   try{const saved=localStorage.getItem('th04.touch.enabled');if(saved!==null)touchEnabled=saved==='true';}catch{}
   const nativeFull=()=>document.fullscreenElement||document.webkitFullscreenElement;
+  let retainPageFullscreen=false;
+  const unlockEscape=()=>{try{navigator.keyboard?.unlock?.();}catch{}};
+  async function exitNative(){
+    if(nativeFull()!==host)return;
+    if(document.exitFullscreen)await document.exitFullscreen();
+    else await document.webkitExitFullscreen?.();
+  }
   function notify(){onChange();}
   function renderTouch(){host.classList.toggle('has-touch',touchEnabled);touch.setAttribute('aria-pressed',String(touchEnabled));}
   function renderAuto(){autoButton.querySelector('strong').textContent='开火';autoButton.querySelector('small').textContent=auto?'已开启 · 点按关闭':'点按开启';autoButton.setAttribute('aria-pressed',String(auto));}
   function reset({keepFire=false}={}){held.clear();drag=null;focusId=null;tapDown=lastTap=null;dx=dy=sampledX=sampledY=0;pulses=0;lastPulse=0;if(!keepFire)auto=false;host.querySelectorAll('.pressed').forEach(n=>n.classList.remove('pressed'));renderAuto();notify();}
   touchLayout=mountTouchLayout(host,{reset,solo});
   function note(text){host.querySelector('.player-note').textContent=text;}
+  function fullscreenLabel(){
+    host.querySelector('.touch-full-open').setAttribute('aria-label',immersive?'退出全屏':'进入全屏');
+    host.querySelector('.touch-full-open').title=immersive?'退出全屏（游戏继续；Esc 暂停）':'进入全屏';
+  }
+  async function pageFullscreen(token){
+    if(token!==requestId)return;
+    // Keep the immersive layout when releasing a native fullscreen that could
+    // not lock Escape. fullscreenchange must not tear down this fallback.
+    retainPageFullscreen=true;unlockEscape();
+    try{await exitNative();}catch{}
+    if(token!==requestId)return;
+    full.textContent='网页全屏 · F11';
+    note('Esc 暂停／继续。已铺满网页，F11 可切换浏览器全屏；右上角按钮退出布局。');
+  }
   function fit(){touchGeometry=null;host.style.setProperty('--player-height',`${Math.round(window.visualViewport?.height||innerHeight)}px`);reset();}
   function gesture(){
     const focused=document.activeElement;if(focused?.closest?.('.player-toolbar,[data-layout-control]'))focused.blur();
     try{Promise.resolve(onGesture()).catch(()=>{});}catch{}
   }
   async function enter({native=true}={}){
-    const token=++requestId;immersive=true;host.classList.add('immersive');document.documentElement.classList.add('th04-immersive');fit();gesture();
-    if(!native){full.textContent='全屏布局';return;}
+    const token=++requestId;immersive=true;retainPageFullscreen=false;host.classList.add('immersive');document.documentElement.classList.add('th04-immersive');fullscreenLabel();fit();gesture();
+    if(!native){retainPageFullscreen=true;full.textContent='全屏布局';return;}
+    const canLock=typeof navigator.keyboard?.lock==='function';
+    const preserveEscape=!touchEnabled||matchMedia('(any-pointer:fine)').matches;
+    // Insecure LAN pages and browsers without Keyboard Lock must not capture
+    // Escape for the Fullscreen API. F11 remains the browser's own shortcut.
+    if(preserveEscape&&!canLock){await pageFullscreen(token);return;}
     try{
       if(nativeFull()!==host){
         if(host.requestFullscreen)await host.requestFullscreen({navigationUI:'hide'});
@@ -65,15 +91,20 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
         else throw Error('unsupported');
       }
       if(token!==requestId){if(nativeFull()===host)await document.exitFullscreen?.();return;}
+      if(canLock){
+        try{await navigator.keyboard.lock(['Escape']);}
+        catch{if(preserveEscape){await pageFullscreen(token);return;}}
+        if(token!==requestId){unlockEscape();return;}
+      }
       full.textContent='已全屏';
-    }catch{if(token===requestId){full.textContent='点击进入全屏';note('已铺满网页；浏览器未允许系统全屏，可点击“进入全屏”重试。');}}
+    }catch{await pageFullscreen(token);}
   }
   async function exit(){
-    requestId++;immersive=false;host.classList.remove('immersive');document.documentElement.classList.remove('th04-immersive');reset();full.textContent='全屏';
-    try{if(nativeFull()===host){if(document.exitFullscreen)await document.exitFullscreen();else await document.webkitExitFullscreen?.();}}catch{}
+    requestId++;immersive=false;retainPageFullscreen=false;unlockEscape();host.classList.remove('immersive');document.documentElement.classList.remove('th04-immersive');fullscreenLabel();reset();full.textContent='全屏';
+    try{await exitNative();}catch{}
   }
   full.onclick=()=>enter();host.querySelector('[data-window]').onclick=()=>exit();
-  touch.onclick=()=>{touch.blur();touchEnabled=!touchEnabled;reset();renderTouch();try{localStorage.setItem('th04.touch.enabled',String(touchEnabled));}catch{}};
+  touch.onclick=()=>{touch.blur();touchEnabled=!touchEnabled;reset();renderTouch();try{localStorage.setItem('th04.touch.enabled',String(touchEnabled));}catch{};if(immersive&&!touchEnabled)enter();};
   host.querySelector('[data-sound]').onclick=gesture;
   autoButton.onclick=()=>{if(!active||!gameplay)return;gesture();auto=!auto;renderAuto();notify();};
   for(const button of host.querySelectorAll('[data-held],[data-pulse],[data-rescue]')){
@@ -85,7 +116,13 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
     const release=event=>{if(!held.has(event.pointerId))return;held.delete(event.pointerId);if(![...held.values()].some(v=>v.button===button))button.classList.remove('pressed');notify();};
     button.addEventListener('pointerup',release);button.addEventListener('lostpointercapture',release);
     button.addEventListener('pointercancel',()=>reset());
-    button.addEventListener('click',event=>event.preventDefault());
+    button.addEventListener('click',event=>{
+      event.preventDefault();
+      // Keyboard/assistive activation has no pointerdown to emit the pulse.
+      if(event.detail===0&&active&&button.dataset.pulse==='128'){
+        gesture();pulses|=128;notify();
+      }
+    });
   }
   function move(event){
     if(tapDown?.id===event.pointerId&&Math.hypot(event.clientX-tapDown.x,event.clientY-tapDown.y)>geometry().height*.05)tapDown.moved=true;
@@ -115,9 +152,10 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
   // Prevent virtual controls from taking focus away from an active pointer.
   host.addEventListener('pointerdown',event=>{if(event.target.closest('[data-layout-control]'))event.preventDefault();});
   window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
+  window.addEventListener('pagehide',unlockEscape);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
   window.addEventListener('resize',fit);window.visualViewport?.addEventListener('resize',fit);
-  for(const name of ['fullscreenchange','webkitfullscreenchange'])document.addEventListener(name,()=>{reset();if(!nativeFull()&&immersive)exit();});
+  for(const name of ['fullscreenchange','webkitfullscreenchange'])document.addEventListener(name,()=>{reset();if(!nativeFull()){unlockEscape();if(immersive&&!retainPageFullscreen)exit();}});
   renderTouch();renderAuto();fit();
   return {stage,enter,exit,reset,note,
     alwaysPointControl:alwaysPoint.closest('label'),
@@ -135,7 +173,9 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
     },
     sample(base=0){
       if(touchLayout.isEditing())return 0;
-      if(!active||document.hidden||!touchEnabled)return base;
+      if(!active||document.hidden)return base;
+      // The on-screen pause button also belongs to keyboard/mouse players.
+      if(!touchEnabled)return base|((pulses&~lastPulse)&128);
       let value=base|(pulses&~lastPulse),rescue=false;
       for(const v of held.values()){value|=v.bits;rescue||=v.rescue;}
       if(auto&&gameplay)value|=32;

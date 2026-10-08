@@ -2,7 +2,7 @@
 export const actions=[['up','上',1],['down','下',2],['left','左',4],['right','右',8],['bomb','炸弹 / 返回',16],['shot','射击',32],['focus','低速 / 救援',64],['pause','暂停 / 继续',128],['confirm','确认',256]];
 export const syntheticInputEvents=new WeakSet();
 const storageKey='th04.controls.v1';
-const primary={up:['ArrowUp'],down:['ArrowDown'],left:['ArrowLeft'],right:['ArrowRight'],bomb:['KeyX'],shot:['KeyZ'],focus:['ShiftLeft','ShiftRight'],pause:['Escape'],confirm:['Enter']};
+const primary={up:['ArrowUp'],down:['ArrowDown'],left:['ArrowLeft'],right:['ArrowRight'],bomb:['KeyX'],shot:['KeyZ'],focus:['ShiftLeft','ShiftRight'],pause:['Escape','KeyP'],confirm:['Enter']};
 const secondary={up:['KeyW'],down:['KeyS'],left:['KeyA'],right:['KeyD'],bomb:['KeyL'],shot:['KeyJ'],focus:['KeyK'],pause:[],confirm:[]};
 const buttons={up:12,down:13,left:14,right:15,bomb:1,shot:0,focus:5,pause:9,confirm:-1};
 const defaults={local1:{keys:primary,pad:buttons},local2:{keys:secondary,pad:buttons},online:{keys:primary,pad:buttons},solo:{keys:primary,pad:buttons}};
@@ -10,7 +10,7 @@ const clone=value=>JSON.parse(JSON.stringify(value));
 const validCode=code=>typeof code==='string'&&/^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Space|Enter|Escape|Tab|Backspace|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Insert|Delete|Home|End|PageUp|PageDown|Numpad[0-9]|Numpad(Add|Subtract|Multiply|Divide|Decimal|Enter)|F([1-9]|1[0-2]))$/.test(code);
 function validate(value){
   const result=clone(defaults);
-  if(value?.version!==1)return result;
+  if(![1,2].includes(value?.version))return result;
   for(const id of Object.keys(defaults)){
     const source=value.profiles?.[id];if(!source)continue;
     const used=new Set();
@@ -22,11 +22,17 @@ function validate(value){
   // A physical key cannot own both local seats.
   const first=new Set(Object.values(result.local1.keys).flat());
   if(Object.values(result.local2.keys).flat().some(code=>first.has(code))){result.local1=clone(defaults.local1);result.local2=clone(defaults.local2);}
+  // Upgrade old Esc-only defaults only when P is free. Explicit v2 bindings,
+  // custom pause keys and the other local player's keys remain untouched.
+  if(value.version===1)for(const id of ['local1','online','solo']){
+    const keys=result[id].keys,owners=id==='local1'?[keys,result.local2.keys]:[keys];
+    if(keys.pause.length===1&&keys.pause[0]==='Escape'&&!owners.some(map=>Object.values(map).flat().includes('KeyP')))keys.pause.push('KeyP');
+  }
   return result;
 }
 let profiles=clone(defaults);
 try{profiles=validate(JSON.parse(localStorage.getItem(storageKey)));}catch{}
-export function controlSnapshot(){return {version:1,profiles:clone(profiles)};}
+export function controlSnapshot(){return {version:2,profiles:clone(profiles)};}
 export function useControlSnapshot(value){profiles=validate(value);}
 export function keyboardBits(keys,id='online'){
   let bits=0;for(const [action,,bit]of actions)if(profiles[id].keys[action].some(code=>keys.has(code)))bits|=bit;return bits;
@@ -48,6 +54,9 @@ export function mountControlSettings(container,{local=false,solo=false,onChange=
   dialog.innerHTML='<h2>自定义操作</h2><p>点击键位后按下新按键。Esc 取消录入；要绑定 Esc，请点「设为 Esc」。重复键位会提示冲突。</p><label>操作对象 <select class="profile"></select></label><div class="control-rows"></div><p>手柄左摇杆保持移动；按钮可修改。手柄用于本地 P2，联机时控制自己所选的座位。</p><p class="control-message" role="status" aria-live="polite"></p><div class="control-footer"><button type="button" class="reset">恢复当前默认</button><button type="button" class="save">保存</button><button type="button" class="cancel">取消</button></div><small>仅保存在当前浏览器及网址。游戏不会因打开设置自动暂停，请先暂停再修改。</small>';
   if(solo)dialog.querySelectorAll('p')[1].textContent='键盘、手柄与触屏均控制单机玩家。手柄左摇杆保持移动；按钮可修改。';
   container.append(trigger,dialog);
+  const pauseHint=document.createElement('small');
+  pauseHint.textContent='Esc 暂停／继续，P 为备用键；F11 切换浏览器全屏，右上角按钮退出游戏全屏布局。';
+  container.append(pauseHint);
   const select=dialog.querySelector('.profile'),rows=dialog.querySelector('.control-rows'),message=dialog.querySelector('.control-message');
   for(const [id,label]of local?[['local1','本地 P1 · 键盘'],['local2','本地 P2 · 键盘 / 手柄']]:solo?[['solo','单机 · 键盘 / 手柄']]:[['online','联机 · 当前玩家']])select.add(new Option(label,id));
   let draft,pending=null;

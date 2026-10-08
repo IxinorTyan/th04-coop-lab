@@ -7,11 +7,11 @@ export function mountTouchLayout(host,{reset,solo=false}){
   const movement=host.querySelector('.player-movement');panel.querySelector('.layout-settings').append(movement);
   panel.querySelector('.layout-settings').append(host.querySelector('.player-toolbar'));
   const opener=document.createElement('button');opener.className='touch-help-open';opener.textContent='按键与触控';host.append(opener);
-  const full=document.createElement('button');full.className='touch-full-open';full.textContent='⛶';full.setAttribute('aria-label','进入全屏');full.onclick=()=>host.querySelector('[data-full]').click();host.append(full);
+  const full=document.createElement('button');full.className='touch-full-open';full.textContent='⛶';full.setAttribute('aria-label','进入全屏');full.onclick=()=>host.querySelector(host.classList.contains('immersive')?'[data-window]':'[data-full]').click();host.append(full);
   const safe=document.createElement('div');safe.className='touch-layout-safe-zone';host.append(safe);
   const hud=host.querySelector('.player-actions');
-  const definitions=[['focus','[data-held]','低速','按住低速'],['fire','[data-auto]','开火','点按切换'],['bomb','[data-pulse="16"]','B','BOMB'],['escape','[data-pulse="128"]','ESC',''],['rescue','[data-rescue]','救援','按住停火'],['confirm','[data-pulse="256"]','确认','']];
-  const controls=definitions.filter(([name])=>!solo||name!=='rescue').map(([name,selector,title,hint])=>{const button=hud.querySelector(selector);button.dataset.layoutControl=name;button.classList.add('touch-'+name);button.innerHTML=`<strong>${title}</strong><small>${hint}</small><i class="layout-resize" aria-hidden="true">↘</i>`;host.append(button);return button;});
+  const definitions=[['focus','[data-held]','低速','按住低速'],['fire','[data-auto]','开火','点按切换'],['bomb','[data-pulse="16"]','B','BOMB'],['escape','[data-pulse="128"]','暂停','继续'],['rescue','[data-rescue]','救援','按住停火'],['confirm','[data-pulse="256"]','确认','']];
+  const controls=definitions.filter(([name])=>!solo||name!=='rescue').map(([name,selector,title,hint])=>{const button=hud.querySelector(selector);button.dataset.layoutControl=name;button.classList.add('touch-'+name);button.innerHTML=`<strong>${title}</strong><small>${hint}</small><i class="layout-resize" aria-hidden="true">↘</i>`;if(name==='escape'){button.setAttribute('aria-label','暂停 / 继续');button.title='暂停 / 继续（Esc，备用 P 键）';}host.append(button);return button;});
   hud.remove();
   for(const button of movement.querySelectorAll('[data-pulse]')){button.dataset.layoutControl=({1:'up',2:'down',4:'left',8:'right'})[button.dataset.pulse];button.innerHTML=`<strong>${({1:'↑',2:'↓',4:'←',8:'→'})[button.dataset.pulse]}</strong><i class="layout-resize" aria-hidden="true">↘</i>`;host.append(button);controls.push(button);}
   const clone=value=>JSON.parse(JSON.stringify(value));
