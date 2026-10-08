@@ -145,9 +145,9 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},solo=false}={
       if(rescue&&gameplay)value=(value&~(16|32))|64;
       return value;
     },
-    pack(buttons){
+    pack(buttons,{includePointPreference=true}={}){
       sampledX=Math.trunc(dx);sampledY=Math.trunc(dy);
-      return packTouch(buttons,{x:sampledX,y:sampledY,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&(drag!==null||sampledX!==0||sampledY!==0),unlimited:unlimited.checked,alwaysPoint:touchEnabled&&alwaysPoint.checked});
+      return packTouch(buttons,{x:sampledX,y:sampledY,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&(drag!==null||sampledX!==0||sampledY!==0),unlimited:unlimited.checked,alwaysPoint:includePointPreference&&touchEnabled&&alwaysPoint.checked});
     },
     consume(){dx-=sampledX;dy-=sampledY;sampledX=sampledY=0;if(!drag)dx=dy=0;const emitted=pulses&~lastPulse;pulses&=~emitted;lastPulse=emitted;}
   };

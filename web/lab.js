@@ -4,9 +4,11 @@ import {writeNativeTouch,touchPlayer} from './native-touch.js';
 import {sha256} from './netplay/sha256.js';
 import {NP21} from './vendor/np2/np2-wasm.js';
 import {mountFocusSettings} from './focus-settings.js';
+import {gameVersion,rememberLanguage} from './game-version.js';
 import {encodeConfig,installConfig} from './launch-config.js';
 import {mountControlSettings,keyboardBits,padBits,isBound,isFormTarget,controlsSummary,syntheticInputEvents} from './control-settings.js';
 const $=id=>document.getElementById(id);
+rememberLanguage($('language'),'local');
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
 let emulator, mailbox=-1, candidates=[], scanCursor=0, lastDiagnostics=-Infinity, lastPadLabel=null, lastPadList=-Infinity, lastTick=-1, lastTickAt=0;
 let keyboard=new Set(), testInput=null, testing=false, padMenu=0, pageFocused=true,oldP1=0;
@@ -176,14 +178,15 @@ $('start').onclick=async()=>{
   try{
     launchSettings={p1:Number($('loadout-p1').value),p2:Number($('loadout-p2').value),difficulty:Number($('difficulty').value),lives:Number($('lives').value),bombs:Number($('bombs').value)};
     const config=encodeConfig(launchSettings);
+    const version=gameVersion($('language').value);
     status('正在校验并加载实验磁盘…');
-    const response=await fetch('th04-coop.hdi.gz',{cache:'no-store'});
+    const response=await fetch(version.coopDisk,{cache:'no-store'});
     if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-    const meta=await (await fetch('disk.json',{cache:'no-store'})).json();
+    const meta=await (await fetch(version.coopMeta,{cache:'no-store'})).json();
     const hash=await sha256(data);
     if(hash!==meta.sha256||data.length!==meta.size)throw Error('实验磁盘校验失败');
-    const patch=await (await fetch('patch.json',{cache:'no-store'})).json();
+    const patch=await (await fetch(gameVersion($('language').value).coopPatch,{cache:'no-store'})).json();
     nativePatch=patch;
     installConfig(data,patch,config);
     emulator=await NP21.create({canvas:$('canvas'),clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'});
@@ -226,7 +229,7 @@ $('hit-test').onclick=async()=>{
     if(s.p2Inv||s.p2Miss)throw Error('请等 P2 无敌 / 复活动画结束后再测试');
     // Recover the guest RAM base from the live code signature and relocated DS.
     // CS is the original main_01 segment; mailbox offset supplied by build.
-    const patch=await (await fetch('patch.json')).json();
+    const patch=await (await fetch(gameVersion($('language').value).coopPatch)).json();
     const csLinear=mailbox-patch.mailbox_cs_offset;
     // Actual load CS cannot be inferred from DS alone; locate P1 data via
     // the exact code-to-DGROUP delta from the rebased MZ layout instead.

@@ -1,5 +1,5 @@
 {
-  "original_md5": "e2b685961daaa8b668b3914461fbdb8a",
+  "original_md5": "06d74719b6f72b11014a392fd34d5f57",
   "original_size": 156258,
   "patched_size": 167890,
   "insert_image_offset": 78048,
@@ -263,12 +263,12 @@
       "name": "render owner Bomb resources"
     }
   ],
-  "sha256": "f93ecb21643fdd044b86dfe6711769d35f5bc12138900f179c86b96aa0ff26f6",
+  "sha256": "aa882324624d493b7f0d823f15d1371cb1585bd486a2eed9e8975fbae174d437",
   "source": {
-    "language": "zh-CN",
-    "file": "4-cn.hdi.gz",
-    "sha256": "53ab10bdcf0869be854069a91680411e2efdd5cd8173e3e782a40644796d7b65",
-    "main_md5": "e2b685961daaa8b668b3914461fbdb8a"
+    "language": "ja",
+    "file": "4-jp.hdi.gz",
+    "sha256": "63b93b637bd5b17b95b9c9996743b6f397df8ede3848ebadde6198f93d5bae05",
+    "main_md5": "06d74719b6f72b11014a392fd34d5f57"
   },
   "code_segment": 2735,
   "data_segment": 9227,
@@ -289,17 +289,17 @@
     ],
     "targets": [
       [
-        6411801,
-        6411802,
-        6411803,
-        6411804,
-        6411805,
-        6411806,
-        6411807,
-        6411808,
-        6411809,
-        6411810,
-        6411811
+        8279577,
+        8279578,
+        8279579,
+        8279580,
+        8279581,
+        8279582,
+        8279583,
+        8279584,
+        8279585,
+        8279586,
+        8279587
       ],
       [
         326673,

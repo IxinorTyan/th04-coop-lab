@@ -119,7 +119,7 @@ class Handler(SimpleHTTPRequestHandler):
                 code=f'{secrets.randbelow(10000):04d}'
                 while code in ROOMS:
                     code=f'{secrets.randbelow(10000):04d}'
-                rollback=data.get('rollback',transport!='ws')
+                rollback=data.get('rollback',False)
                 if type(rollback) is not bool:
                     return self.reply({'error':'回滚设置必须为开或关'},400)
                 token=secrets.token_urlsafe(24)
@@ -127,7 +127,7 @@ class Handler(SimpleHTTPRequestHandler):
                     'transport':transport,
                     'seen':{r:now for r in ROLES},'revision':1,'phase':'lobby','slots':{r:None for r in ROLES},
                     'ready':{r:False for r in ROLES},'generation':secrets.token_hex(8),
-                    'settings':{'p1':0,'p2':2,'p3':0,'players':2,'difficulty':1,'lives':3,'bombs':2,'rollback':rollback}}
+                    'settings':{'p1':0,'p2':2,'p3':0,'players':2,'difficulty':1,'lives':3,'bombs':2,'language':'cn','rollback':rollback}}
                 return self.reply({'room':code,'token':token,'role':'host','protocol':PROTOCOL,'state':snapshot(ROOMS[code])})
             code=str(data.get('room','')).upper()
             if len(code)!=4 or any(c not in '0123456789' for c in code):
@@ -188,7 +188,7 @@ class Handler(SimpleHTTPRequestHandler):
                         return self.reply({'error':'只有房主可以修改本局设置'},403)
                     value=data.get('settings',{})
                     bounds={'players':(2,3),'difficulty':(0,4),'lives':(1,6),'bombs':(0,2)}
-                    if not isinstance(value,dict) or set(value)!=(set(bounds)|{'rollback'}) or type(value.get('rollback')) is not bool or any(type(value[k]) is not int or not lo<=value[k]<=hi for k,(lo,hi) in bounds.items()):
+                    if not isinstance(value,dict) or set(value)!=(set(bounds)|{'rollback','language'}) or value.get('language') not in ('cn','jp') or type(value.get('rollback')) is not bool or any(type(value[k]) is not int or not lo<=value[k]<=hi for k,(lo,hi) in bounds.items()):
                         return self.reply({'error':'开局设置无效'},400)
                     if value['players']==2 and (room['guest2'] or 2 in room['slots'].values()):
                         return self.reply({'error':'请先让第三位加入者离开，并腾出 P3 座位，再关闭 3P'},409)

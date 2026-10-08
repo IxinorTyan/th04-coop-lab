@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="player-ui.css">
 
 <link rel="stylesheet" href="site.css?v=20261007"><link rel="stylesheet" href="room.css?v=20261007"><body class="shell"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 04</a><small>東方幻想郷 · LOTUS LAND STORY</small></header>
-<nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html">原版单机</a><a data-mode="local" href="local.html">本地双人 · 测试</a><a data-mode="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" href="lan.html?network=public">公网联机</a></nav>
+<nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html">单机游戏</a><a data-mode="local" href="local.html">本地双人 · 测试</a><a data-mode="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" href="lan.html?network=public">公网联机</a></nav>
 <header class="intro"><span class="eyebrow">LOTUS LAND STORY / MULTIPLAYER</span><h1 id="page-title">局域网联机</h1><p id="mode-description">与伙伴一起，进入幻想乡。</p></header>
 <section class="panel entry-grid" id="entry" aria-label="创建或加入房间"><div><h2>创建房间</h2><p>邀请伙伴，选择机体与难度。</p><button class="primary" id="create">创建房间 →</button></div><div><h2>加入伙伴</h2><p>输入伙伴分享的四位房间号。</p><div class="join-row"><input id="room" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" placeholder="四位房间号" aria-label="房间号"><button id="join">加入房间</button></div></div></section>
 <div id="status" role="status">正在加载联机页面…</div>
@@ -13,12 +13,12 @@
 <section id="lobby" hidden>
 <p id="room-info" class="room-code"></p>
 <div class="seat-row"><button id="seat0">选择 P1</button><button id="seat1">选择 P2</button><button id="seat2" hidden>选择 P3</button></div><p id="seats"></p><section id="loadout-panel" class="loadout-panel" hidden><div class="section-kicker">YOUR CHARACTER / 自机</div><h2>选择你的自机</h2><p>请先落座，再选择本机使用的角色。</p><div class="loadout-grid"><button type="button" class="loadout-card" data-loadout="0"><strong>灵梦 A</strong><small>梦想封印 · 标准型</small></button><button type="button" class="loadout-card" data-loadout="1"><strong>灵梦 B</strong><small>封魔针 · 集中型</small></button><button type="button" class="loadout-card" data-loadout="2"><strong>魔理沙 A</strong><small>魔法导弹 · 标准型</small></button><button type="button" class="loadout-card" data-loadout="3"><strong>魔理沙 B</strong><small>星尘激光 · 集中型</small></button></div><p id="loadout-status" class="muted"></p></section>
-<fieldset id="settings"><legend>本局设置 · 房主修改</legend><div class="settings-grid">
+<fieldset id="settings"><legend>本局设置 · 房主修改（全员使用相同语言）</legend><div class="settings-grid"><label>游戏语言 <select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label>
 <label>人数 <select id="players"><option value="2" selected>双人（关闭 3P）</option><option value="3">三人（启用 3P）</option></select></label>
 <label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option><option value="3">Lunatic</option><option value="4">Extra</option></select></label>
 <label>生命 <select id="lives"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
 <label>炸弹 <select id="bombs"><option>0</option><option>1</option><option selected>2</option></select></label>
-</div><label class="rollback-option"><input id="rollback" type="checkbox" role="switch" aria-describedby="rollback-help"> 启用回滚</label><p id="rollback-help" class="muted">开启：操作响应更快，但占用更多性能；关闭：等待所有玩家输入，网络延迟会更明显。仅房主可在开局前修改，修改后需全员重新准备。</p></fieldset>
+</div><label class="rollback-option"><input id="rollback" type="checkbox" role="switch" aria-describedby="rollback-help"> 启用回滚</label><p id="rollback-help" class="muted">默认关闭。开启：操作响应更快，但占用更多性能；关闭：等待所有玩家输入，网络延迟会更明显。仅房主可在开局前修改，修改后需全员重新准备。</p></fieldset>
 <details><summary>合作玩法</summary><p>分数、点、梦、擦弹独立计算，游戏面板显示自己的数据。双人得分 ×1.5，三人 ×2.2。</p><p>Power 获取：双人 ×1.5，三人 ×2（半点收益累计）。Boss 每阶段耐久：双人 ×1.5，三人 ×2.2。倍率按开局人数固定。启用 3P 后需三人全员准备。</p></details>
 <div class="row"><button id="ready">准备</button><button id="start" class="primary">房主开始游戏</button><button id="leave">结束并返回</button></div>
 </section>

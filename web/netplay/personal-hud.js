@@ -1,4 +1,5 @@
 import {hudDigits} from './hud-digits.js';
+import {drawCollisionPoints} from './collision-points.js';
 
 // Only final pixels differ by local seat. Never write a local seat selector
 // into NP21 RAM, VRAM, devices, snapshots or the state checksum.
@@ -17,7 +18,7 @@ export function createPersonalHud(canvas,nativeCanvas){
     for(let i=0;i<count;i++)if(text[i]!==' ')
       context.drawImage(atlas,Number(text[i])*16,0,16,16,x+i*16,y,16,16);
   }
-  return ({heap,mailbox,patch,slot,guestBase,raw=false})=>{
+  return ({heap,mailbox,patch,slot,guestBase,raw=false,points={}})=>{
     if(canvas.width!==nativeCanvas.width||canvas.height!==nativeCanvas.height){
       canvas.width=nativeCanvas.width;canvas.height=nativeCanvas.height;
     }
@@ -29,6 +30,7 @@ export function createPersonalHud(canvas,nativeCanvas){
     // Don't paint over the boot screen, cleared menus or ending artwork.
     const cell=view.getUint16(tram+6*160+56*2,true);
     if((cell&255)!==0x57||(cell>>>8)<0x20||(cell>>>8)>0x29)return;
+    drawCollisionPoints(context,{heap,mailbox,patch,...points});
     const schema=patch.personal_stats;
     const at=mailbox-patch.mailbox_cs_offset+schema.cs_offset+slot*schema.stride;
     number(view.getUint32(at+schema.high_score,true),448,64,8,true);

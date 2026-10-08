@@ -23,10 +23,27 @@
 # The root allowlist excludes tools/, patches/, reports/, DEVELOPMENT.md,
 # build/, baseline/, extracted/, reference/, vendor-source/, local credentials,
 # tunnel URL files and any future development-only root files by default.
-# Keep ALL current web disks, JS/WASM, fonts, music, assets and JSON manifests.
+# Keep runtime JS/WASM, fonts, music, assets and JSON manifests.
+# Only the four patched game disks (solo/co-op, Chinese/Japanese) ship.
+# The supplied 4-cn source and Japanese baseline stay outside web/.
+/web/*.hdi
+/web/*.hdi.gz
+!/web/th04-coop.hdi.gz
+!/web/th04-solo.hdi.gz
+!/web/th04-coop-jp.hdi.gz
+!/web/th04-solo-jp.hdi.gz
+/web/disks/
+
+# Development output must not leak into web/ when copied there for inspection.
+/web/baseline/
+/web/build/
+/web/extracted/
+/web/reports/
+/web/screenshots/
+/web/tools/
+/web/vendor-source/
 
 # Retired assets are not used by the current game.
-/web/th04-local-music.hdi.gz
 /web/local-music-disk.json
 /web/local-music-patch.json
 /web/netplay/frame-queue.js
@@ -44,5 +61,10 @@ Desktop.ini
 *.log
 *.tmp
 *.swp
+*.bak
+*.orig
+*~
+.idea/
+.vscode/
 .env
 .env.*

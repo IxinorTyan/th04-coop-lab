@@ -17,7 +17,7 @@ const mode=readNetworkMode(),networkMode=mode.network;
 const useRelay=mode.transport==='ws';
 // Legacy URL preference only seeds a newly created room. Joining clients
 // always use the host's server-authoritative setting, frozen at game start.
-const defaultRollback=mode.rollback==='on'||(!useRelay&&mode.rollback!=='off');
+const defaultRollback=mode.rollback==='on';
 let inputPolicy;
 let relay;
 let preparing=false,running=false,stopped=false,busy=false,runRequested=false;
@@ -227,7 +227,7 @@ function render(){
   if(!session||!state)return;
   const slot=state.slots[session.role],lobby=state.phase==='lobby'&&!stopped,active=activeRoles();
   $('entry').hidden=true;$('lobby').hidden=false;$('transport').disabled=true;
-  $('room-info').textContent=`房间 ${session.room} · ${state.settings.players} 人模式 · 你是${label(session.role)} · ${slot===null?'尚未选座':`P${slot+1}`}`;
+  $('room-info').textContent=`房间 ${session.room} · ${state.settings.players} 人模式 · ${state.settings.language==='jp'?'日文版':'汉化版'} · 你是${label(session.role)} · ${slot===null?'尚未选座':`P${slot+1}`}`;
   $('seats').textContent=Array.from({length:state.settings.players},(_,n)=>{
     const role=active.find(r=>state.slots[r]===n);return `P${n+1}：${role?`${label(role)}${peers.get(role)?.offline?'（已离线）':state.ready[role]?'（已准备）':''}`:'空位'}`;
   }).join(' / ');
@@ -238,7 +238,7 @@ function render(){
     $(`seat${n}`).setAttribute('aria-pressed',String(slot===n));
   }
   $('settings').disabled=!lobby||busy||session.role!=='host';
-  for(const key of settingNames)$(key).value=state.settings[key];
+  for(const key of [...settingNames,'language'])$(key).value=state.settings[key];
   if(!busy)$('rollback').checked=state.settings.rollback;
   const loadoutSlot=slot===null?null:`p${slot+1}`;
   $('loadout-panel').hidden=slot===null||!lobby;
@@ -257,7 +257,7 @@ function render(){
 }
 function update(value){
   if(stopped)return;
-  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean')throw Error('请重启新版 start-lan.bat 并刷新所有玩家的页面');
+  if(!value||value.protocol!==PROTOCOL||typeof value.settings?.rollback!=='boolean'||!['cn','jp'].includes(value.settings?.language))throw Error('请重启新版 start-lan.bat 并刷新所有玩家的页面');
   if(state&&value.revision<=state.revision)return;
   state=value;render();
   if(state.phase==='ended'){closeDisconnected('房主已离开');return;}
@@ -618,9 +618,10 @@ function simulate(pair,replay){
 }
 function captureLocalInput(){
   player.setContext(runtime.touchContext());
+  runtime.setPointPreferences({focus:!!focusSettings(),always:player.alwaysPoint()});
   const value=controlEditor.isEditing()?0:normalize(player.sample(keyboardBits(keys)|childBits|gamepadBits()));
   if(value!==bits){bits=value;inputChangedAt=performance.now();}
-  const captured=queue.capture(player.pack(bits|pendingAction|(focusSettings()?2048:0)));
+  const captured=queue.capture(player.pack(bits|pendingAction,{includePointPreference:false}));
   if(!captured)return false;
   player.consume();
   pendingAction=0;captureTimes.set(captured.frame,performance.now());broadcast(captured);return true;
@@ -735,9 +736,9 @@ window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/le
 $('create').onclick=()=>enter('host');$('join').onclick=()=>enter('guest');
 for(let n=0;n<3;n++)$(`seat${n}`).onclick=()=>action('seat',{slot:n});
 for(const card of document.querySelectorAll('[data-loadout]'))card.onclick=()=>action('loadout',{loadout:Number(card.dataset.loadout)});
-for(const name of [...settingNames,'rollback'])$(name).onchange=()=>{
+for(const name of [...settingNames,'language','rollback'])$(name).onchange=()=>{
   if(session?.role!=='host'||state?.phase!=='lobby')return;
-  action('settings',{settings:{...Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)])),rollback:$('rollback').checked}});
+  action('settings',{settings:{...Object.fromEntries(settingNames.map(key=>[key,Number($(key).value)])),language:$('language').value,rollback:$('rollback').checked}});
 };
 $('ready').onclick=()=>{
   if(!state.ready[session.role]&&session.role!=='host')player.note('已准备，等待房主开始。房主开始后进入游戏画面。');

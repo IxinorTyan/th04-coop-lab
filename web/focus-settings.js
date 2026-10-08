@@ -1,4 +1,4 @@
-// Persistent preference. Online callers send it through the input timeline.
+// Persistent browser preference. Online display stays outside the input timeline.
 export function mountFocusSettings(container,{local=false,alwaysPointControl=null,profile=null}={}){
   const boxes=[];
   for(let slot=0;slot<(local?2:1);slot++){
@@ -16,5 +16,8 @@ export function mountFocusSettings(container,{local=false,alwaysPointControl=nul
     alwaysPointControl.classList.remove('touch-option');
     container.append(alwaysPointControl);
   }
+  const note=document.createElement('small');
+  note.textContent='判定点设置只影响当前浏览器的画面，不影响其他玩家。';
+  container.append(note);
   return ()=>boxes.reduce((mask,box,slot)=>mask|(box.checked?1<<slot:0),0);
 }

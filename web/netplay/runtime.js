@@ -1,4 +1,5 @@
 import {createFrameGate} from '../frame-limit.js';
+import {gameVersion} from '../game-version.js';
 import {NP21} from '../vendor/np2/np2-wasm.js';
 import {writeNativeTouch,touchPlayer} from '../native-touch.js';
 import {encodeConfig,installConfig} from '../launch-config.js';
@@ -14,6 +15,7 @@ nativeCanvas.style.display='none';
 document.body.append(nativeCanvas);
 const presentPersonalHud=createPersonalHud(canvas,nativeCanvas);
 let rawPresentation=false,presentationCount=0;
+let pointPreferences={focus:true,always:false};
 const presentationDue=createFrameGate();
 const signature=new TextEncoder().encode('TH04COOPLABv001!');
 const keyTable=[['ArrowUp','ArrowUp',38,1],['ArrowDown','ArrowDown',40,2],['ArrowLeft','ArrowLeft',37,4],['ArrowRight','ArrowRight',39,8],['KeyX','x',88,16],['KeyZ','z',90,32],['ShiftLeft','Shift',16,64],['Escape','Escape',27,128],['Enter','Enter',13,256]];
@@ -85,11 +87,12 @@ async function bootProgress(message,step){
   await new Promise(resolve=>setTimeout(resolve,0));
 }
 async function boot(config){
+  const selected=gameVersion(config.language);
   await bootProgress('下载游戏磁盘与版本清单',1);
   if(typeof WebAssembly==='undefined')throw Error('浏览器不支持 WebAssembly，请使用最新版 Chrome / Edge / Safari');
   if(typeof DecompressionStream==='undefined')throw Error('浏览器缺少 gzip 解压支持，请更新浏览器');
   const [compressed,meta,manifest,version]=await Promise.all([
-    get('../th04-coop.hdi.gz','arrayBuffer'),get('../disk.json'),get('../patch.json'),get('./runtime.json')]);
+    get('../'+selected.coopDisk,'arrayBuffer'),get('../'+selected.coopMeta),get('../'+selected.coopPatch),get('./runtime.json')]);
   patch=manifest;
   await bootProgress('解压游戏磁盘',2);
   const disk=new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
@@ -99,7 +102,7 @@ async function boot(config){
   await bootProgress('安装本局配置和声音补丁',4);
   // Apply the game's own BGM OFF / FM SE ON settings to this private copy.
   // Keep the original launcher, PMD driver, shared disk and single-player intact.
-  const sound=soundPolicy=version.native_sound;
+  const sound=soundPolicy=version.native_sound_by_language?.[selected.language];
   if(sound?.disk_sha256!==meta.sha256||sound.bgm!==0||sound.se!==1||sound.schema!==2||!sound.edits?.length)
     throw Error('联机声音配置版本不匹配，请重启服务并刷新所有玩家页面');
   for(const edit of sound.edits){
@@ -148,7 +151,7 @@ function stepInner(inputs){
   if(mailbox<0&&emulatedTicks%15===0)findMailbox();
   if(mailbox>=0){
     emulator.module.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.focus_visible_mask_cs_offset]=
-      inputs.reduce((mask,value,slot)=>mask|((value&2048)?1<<slot:0)|(Math.floor(value/2**42)%2?1<<(slot+3):0),0);
+      0; // All peers disable native markers; browser preferences only affect final pixels.
   }
   inputs=inputs.map(value=>(value&4095)&~2048);
   const wasPaused=pauseMenu.paused,result=mailbox>=0?pauseMenu.step(inputs):'play';
@@ -200,7 +203,7 @@ function step(inputs,{frame=ticks,replay=false,offlineMask=0}={}){
     if(mailbox>=0)emulator.module.HEAPU8[mailbox-patch.mailbox_cs_offset+patch.offline_mask_cs_offset]=offlineMask;
     currentEffect.result=stepInner(inputs);effects.set(frame,currentEffect);
     if(!replay&&presentationDue(performance.now())){presentationCount++;presentPersonalHud({raw:rawPresentation,heap:emulator.module.HEAPU8,mailbox,patch,slot:localSlot,
-      guestBase:mailbox>=0?guestBase():0});}
+      guestBase:mailbox>=0?guestBase():0,points:{...pointPreferences,players:playerCount}});}
     return currentEffect.result;
   }finally{emulator.module.netEndFrame();replaying=false;currentEffect=null;}
 }
@@ -293,6 +296,7 @@ function checksum(){
   return {tick:ticks,hash:(h>>>0).toString(16).padStart(8,'0'),gameFrame:v.getUint32(mailbox+16,true)};
 }
 window.th04Sync={
+  setPointPreferences({focus,always}){pointPreferences={focus:!!focus,always:!!always};},
   diagnosticText:()=>`${details.textContent}\n画面提交 ${presentationCount} · ${rawPresentation?"原始画面":"个人 HUD"}`,
   setRawPresentation(value){rawPresentation=!!value;},
   setMusicVolume(value){document.getElementById('bgm-volume').value=value;bgm?.setVolume(Number(value)/100);},

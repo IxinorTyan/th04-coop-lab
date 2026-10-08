@@ -1,4 +1,5 @@
 import {startFrameLoop} from './frame-limit.js';
+import {gameVersion,rememberLanguage} from './game-version.js';
 // Standalone original game. No cooperative runtime, launcher or netplay session.
 import {NP21} from './vendor/np2/np2-wasm.js';
 import {mountPlayer} from './player-ui.js';
@@ -7,6 +8,7 @@ import {mountControlSettings,keyboardBits,padBits,isBound,isFormTarget,controlsS
 import {unpackTouch} from './touch-input.js';
 import {sha256} from './netplay/sha256.js';
 const $=id=>document.getElementById(id);
+rememberLanguage($('language'),'solo');
 let emulator,patch,mailbox=-1,scanCursor=0,oldBits=0,focused=true,started=false,menuBits=0,menuUntil=0;
 const keys=new Set(),seen=new Map();
 const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
@@ -101,17 +103,18 @@ document.addEventListener('focusin',e=>{if(isFormTarget(e.target))release();});
 canvas.onpointerdown=()=>canvas.focus();
 $('restart').onclick=()=>location.reload();
 $('start').onclick=async()=>{
-  if(started)return;started=true;$('start').disabled=true;player.enter();
+  if(started)return;started=true;$('start').disabled=true;$('language').disabled=true;player.enter();
+  const version=gameVersion($('language').value);
   const status=text=>{$('status').textContent=text;player.note(text);player.diagnostics(text);};
   try{
-    status('正在加载原版单机磁盘…');
-    const meta=await fetch('solo-patch.json',{cache:'no-store'});if(!meta.ok)throw Error(`配置 HTTP ${meta.status}`);patch=await meta.json();
-    const response=await fetch('th04-solo.hdi.gz',{cache:'no-store'});if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
+    status(`正在加载${version.label}单机磁盘…`);
+    const meta=await fetch(version.soloPatch,{cache:'no-store'});if(!meta.ok)throw Error(`配置 HTTP ${meta.status}`);patch=await meta.json();
+    const response=await fetch(version.soloDisk,{cache:'no-store'});if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     if(data.length!==patch.disk.size||await sha256(data)!==patch.disk.sha256)throw Error('单机磁盘校验失败');
     emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'});
     emulator.addDiskImage('th04-solo.hdi',data);emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();
-    status('原版单机已启动，请等待开头，在游戏内选择模式与角色。');$('restart').disabled=false;
+    status(`${version.label}单机已启动，请等待开头，在游戏内选择模式与角色。`);$('restart').disabled=false;
   }catch(e){player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}
 };
 
