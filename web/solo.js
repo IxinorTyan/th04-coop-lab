@@ -1,3 +1,4 @@
+import {SoloMusic} from './solo-music.js';
 import {startFrameLoop} from './frame-limit.js';
 import {mountSoloPerformance} from './solo-performance.js';
 import {gameVersion,rememberLanguage} from './game-version.js';
@@ -10,14 +11,17 @@ import {unpackTouch} from './touch-input.js';
 import {sha256} from './netplay/sha256.js';
 const $=id=>document.getElementById(id);
 const audioMode=$('audio-mode');
-try{const saved=localStorage.getItem('solo-audio-mode');if(['original','buffered'].includes(saved))audioMode.value=saved;}catch{}
-audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode',audioMode.value);}catch{}};
+let soloMusic;
+window.addEventListener('pagehide',event=>{if(event.persisted)soloMusic?.suspend();else soloMusic?.dispose();});
+window.addEventListener('pageshow',event=>{if(event.persisted)soloMusic?.resume();});
+try{const saved=localStorage.getItem('solo-audio-mode-v2');if(['independent','original','buffered'].includes(saved))audioMode.value=saved;}catch{}
+audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode-v2',audioMode.value);}catch{}};
 
 rememberLanguage($('language'),'solo');
 let emulator,patch,mailbox=-1,scanCursor=0,oldBits=0,focused=true,started=false,menuBits=0,menuUntil=0;
 const keys=new Set(),seen=new Map();
 const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
-const player=mountPlayer($('game'),{solo:true,onGesture:async()=>{await emulator?.module.SDL2?.audioContext?.resume();}});
+const player=mountPlayer($('game'),{solo:true,onGesture:async()=>{soloMusic?.resume();await emulator?.module.SDL2?.audioContext?.resume();}});
 mountSoloPerformance({host:$('game'),game:'04',getEmulator:()=>emulator,readState:()=>{
   const s=readSoloState();return s?{playing:s.mode===1&&!s.flags,generation:s.generation,ticks:s.ticks}:null;
 }});
@@ -66,6 +70,7 @@ function scan(now){
 }
 function tick(now){
   if(emulator?.state==='running'){
+    soloMusic?.poll(emulator.module.HEAPU8,now);
     const state=scan(now),game=state?.mode===1;
     const enabled=focused&&!document.hidden&&!editor.isEditing();
     player.setContext({key:`${mailbox}:${state?.generation||0}:${game?'game':'menu'}`,play:enabled&&game&&!state.flags});
@@ -106,7 +111,9 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
 },true);
 window.addEventListener('keypress',e=>{if(!syntheticInputEvents.has(e)&&!isFormTarget(e.target)){e.preventDefault();e.stopImmediatePropagation();}},true);
 window.addEventListener('blur',()=>{focused=false;release();});window.addEventListener('focus',()=>{focused=true;});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
+let hiddenPaused=false;
+document.addEventListener('visibilitychange',()=>{if(document.hidden){release();soloMusic?.suspend();hiddenPaused=emulator?.state==='running';emulator?.pause();}
+  else if(hiddenPaused){hiddenPaused=false;emulator?.run();soloMusic?.resume();}});
 document.addEventListener('focusin',e=>{if(isFormTarget(e.target))release();});
 canvas.onpointerdown=()=>canvas.focus();
 $('restart').onclick=()=>location.reload();
@@ -115,15 +122,17 @@ $('start').onclick=async()=>{
   const version=gameVersion($('language').value);
   const status=text=>{$('status').textContent=text;player.note(text);player.diagnostics(text);};
   try{
+    if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
     status(`正在加载${version.label}单机磁盘…`);
     const meta=await fetch(version.soloPatch,{cache:'no-store'});if(!meta.ok)throw Error(`配置 HTTP ${meta.status}`);patch=await meta.json();
     const response=await fetch(version.soloDisk,{cache:'no-store'});if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     if(data.length!==patch.disk.size||await sha256(data)!==patch.disk.sha256)throw Error('单机磁盘校验失败');
-    emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value==='buffered',no_mouse:true,use_menu:false,fontfile:'font.bmp'});
+    if(soloMusic)await soloMusic.install(data,'GENSO');
+    emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',no_mouse:true,use_menu:false,fontfile:'font.bmp'});
     emulator.addDiskImage('th04-solo.hdi',data);emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();
     status(`${version.label}单机已启动，请等待开头，在游戏内选择模式与角色。`);$('restart').disabled=false;
-  }catch(e){player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}
+  }catch(e){soloMusic?.dispose();player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}
 };
 
 // Read-only diagnostics used by the standalone browser smoke test.
