@@ -3,7 +3,8 @@
 <body class="shell"><header class="masthead"><a class="brand" href="index.html">TOUHOU / 04</a><small>東方幻想郷 · LOTUS LAND STORY</small></header>
 <nav class="mode-nav" aria-label="游戏模式"><a data-mode="solo" href="solo.html" aria-current="page">单机游戏</a><a data-mode="local" href="local.html">本地双人 · 测试</a><a data-mode="lan" href="lan.html?network=lan">局域网联机</a><a data-mode="public" href="lan.html?network=public">公网联机</a></nav>
 <main><header class="intro"><span class="eyebrow">ORIGINAL / SINGLE PLAYER</span><h1>单机游戏</h1><p>选择汉化或日文版本，从开头进入幻想乡。在原版菜单中选择难度、角色与机体，保留原版单人玩法。</p></header>
-<div class="row"><label>游戏语言 <select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label><button class="primary" id="start">开始单机游戏</button><button id="restart" disabled>重新启动</button></div>
+<div class="row"><label>游戏语言 <select id="language"><option value="cn">汉化版</option><option value="jp">日文版</option></select></label>
+<label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="buffered">原声·抗卡顿缓冲（手机建议）</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">缓冲模式约增加 0.2 秒声音延迟，可减轻短暂卡顿造成的断音；不会加速游戏。</small><button class="primary" id="start">开始单机游戏</button><button id="restart" disabled>重新启动</button></div>
 <div id="control-settings" class="row" aria-label="操作与判定点显示设置"></div>
 <p id="controls-summary"></p><p>触屏：拖动移动，第二指低速；菜单使用方向键与「确认」，Bomb 可返回。右上角「按键与触控」可调整布局、双击 Bomb 和不限速移动。</p>
 <div id="status" role="status">等待开始。保留原版开头、标题菜单和选人流程。</div>

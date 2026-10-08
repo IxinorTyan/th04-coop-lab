@@ -1,4 +1,5 @@
 import {startFrameLoop} from './frame-limit.js';
+import {mountSoloPerformance} from './solo-performance.js';
 import {gameVersion,rememberLanguage} from './game-version.js';
 // Standalone original game. No cooperative runtime, launcher or netplay session.
 import {NP21} from './vendor/np2/np2-wasm.js';
@@ -8,11 +9,18 @@ import {mountControlSettings,keyboardBits,padBits,isBound,isFormTarget,controlsS
 import {unpackTouch} from './touch-input.js';
 import {sha256} from './netplay/sha256.js';
 const $=id=>document.getElementById(id);
+const audioMode=$('audio-mode');
+try{const saved=localStorage.getItem('solo-audio-mode');if(['original','buffered'].includes(saved))audioMode.value=saved;}catch{}
+audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode',audioMode.value);}catch{}};
+
 rememberLanguage($('language'),'solo');
 let emulator,patch,mailbox=-1,scanCursor=0,oldBits=0,focused=true,started=false,menuBits=0,menuUntil=0;
 const keys=new Set(),seen=new Map();
 const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
 const player=mountPlayer($('game'),{solo:true,onGesture:async()=>{await emulator?.module.SDL2?.audioContext?.resume();}});
+mountSoloPerformance({host:$('game'),game:'04',getEmulator:()=>emulator,readState:()=>{
+  const s=readSoloState();return s?{playing:s.mode===1&&!s.flags,generation:s.generation,ticks:s.ticks}:null;
+}});
 const screen=document.createElement('div');screen.className='screen solo-screen';
 const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;screen.append(canvas);player.stage.append(screen);
 const focus=mountFocusSettings($('control-settings'),{alwaysPointControl:player.alwaysPointControl,profile:'solo'});
@@ -103,7 +111,7 @@ document.addEventListener('focusin',e=>{if(isFormTarget(e.target))release();});
 canvas.onpointerdown=()=>canvas.focus();
 $('restart').onclick=()=>location.reload();
 $('start').onclick=async()=>{
-  if(started)return;started=true;$('start').disabled=true;$('language').disabled=true;player.enter();
+  if(started)return;started=true;$('start').disabled=true;audioMode.disabled=true;$('language').disabled=true;player.enter();
   const version=gameVersion($('language').value);
   const status=text=>{$('status').textContent=text;player.note(text);player.diagnostics(text);};
   try{
@@ -112,7 +120,7 @@ $('start').onclick=async()=>{
     const response=await fetch(version.soloDisk,{cache:'no-store'});if(!response.ok)throw Error(`磁盘 HTTP ${response.status}`);
     const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     if(data.length!==patch.disk.size||await sha256(data)!==patch.disk.sha256)throw Error('单机磁盘校验失败');
-    emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,no_mouse:true,use_menu:false,fontfile:'font.bmp'});
+    emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:16,ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value==='buffered',no_mouse:true,use_menu:false,fontfile:'font.bmp'});
     emulator.addDiskImage('th04-solo.hdi',data);emulator.setHdd(0,'th04-solo.hdi');emulator.run();player.setActive(true);canvas.focus();
     status(`${version.label}单机已启动，请等待开头，在游戏内选择模式与角色。`);$('restart').disabled=false;
   }catch(e){player.setActive(false);player.exit();status(`启动失败：${e.message}`);$('restart').disabled=false;console.error(e);}

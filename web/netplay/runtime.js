@@ -124,7 +124,7 @@ async function boot(config){
   // No music imports/downloads/decoding until an actual game frame is observed.
   musicSettings=config;
   await bootProgress('原游戏磁盘和引擎已就绪，等待全员同步开局',7);
-  return {presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
+  return {presentation:version.presentation_sha256,disk:meta.sha256,runtime:version.generated_js_sha256,wasm:version.wasm_sha256,mobileWasm:version.mobile_wasm_sha256,clock:version.clock_sha256,audio:version.audio_output_sha256,nativeSound:sound,queue:version.rollback_queue_sha256,snapshots:version.native_snapshots_sha256,controls:version.controls_sha256,pause:version.pause_sha256,game:version.game_adapter_sha256,room:version.room_sha256,membership:version.membership_sha256,startup:version.startup_sha256,hostSlot:pauseMenu.hostSlot,adapter:version.adapter};
 }
 function findMailbox(){
   const heap=emulator.module.HEAPU8,view=new DataView(heap.buffer);

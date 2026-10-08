@@ -13,6 +13,7 @@ class NP2 {
         this.config = config;
         const module = this.module = {
             canvas: this.config.canvas,
+            nativeSoloAudio: this.config.nativeSoloAudio === true,
             lockstepEpoch: this.config.lockstepEpoch,
             preRun: [
                 () => {
