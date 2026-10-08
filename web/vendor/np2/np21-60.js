@@ -38,7 +38,10 @@ function openBufferedSoloAudio(Module, channels, frames, render) {
   const info=()=>({mode:'buffered-native',underruns,queuedMs:Math.max(0,end-context.currentTime)*1000});
   Module.soloAudioInfo=info;
   context.addEventListener('statechange',onState);
-  timer=setInterval(pump,25);pump();
+  // SDL opens the device before its native callback buffers are initialized.
+  // Rendering synchronously here re-enters SDL_OpenAudio and corrupts memory
+  // (including HDD configuration). First render only after this stack returns.
+  timer=setInterval(pump,25);
 }
 import {createFrameGate} from "../../frame-limit.js";
 
