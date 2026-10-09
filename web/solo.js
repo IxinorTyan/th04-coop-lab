@@ -3,6 +3,7 @@ import {mountSoloView} from './solo-view.js';
 import {SoloMusic} from './solo-music.js';
 import {startFrameLoop} from './frame-limit.js';
 import {mountSoloPerformance} from './solo-performance.js';
+import {mountSoloFault} from './solo-fault.js';
 import {mountSoloTestTools,readSoloDiagnostics,writeSoloTestCommand} from './solo-test-tools.js';
 import {gameVersion,rememberLanguage} from './game-version.js';
 // Standalone original game. No cooperative runtime, launcher or netplay session.
@@ -27,6 +28,7 @@ const keys=new Set(),seen=new Map();
 const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
 const player=mountPlayer($('game'),{solo:true,onGesture:async()=>{soloMusic?.resume();await emulator?.module.SDL2?.audioContext?.resume();}});
 mountSoloView($('game'));
+mountSoloFault({host:$('game'),getEmulator:()=>emulator,readState:readSoloState,readContext:()=>({language:$('language').value,audio:audioMode.value,status:$('status').textContent})});
 mountSoloPerformance({host:$('game'),game:'04',getEmulator:()=>emulator,readState:()=>{
   const s=readSoloState();return s?{...s,playing:s.mode===1&&!s.flags}:null;
 }});

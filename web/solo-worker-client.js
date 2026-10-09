@@ -49,6 +49,7 @@ export class WorkerNP21 {
   receive(data){
     if(this.closed)return;
     if(data.type==='error'){
+      if(data.diagnostics)this.lastDiagnostics=data.diagnostics;
       const pending=this.pending.get(data.id);
       if(pending){clearTimeout(pending.timeout);this.pending.delete(data.id);pending.reject(Error(data.message));}
       else this.fail(Error(data.message));

@@ -1,5 +1,6 @@
 import {workerEnvironment} from './solo-worker-environment.js';
 import {readSoloDiagnostics,writeSoloTestCommand} from './solo-test-tools.js';
+import {readSoloFault} from './solo-fault.js';
 
 let emulator,environment,bridge,music,game,patch,mailbox=-1,cursor=0;
 const seen=new Map(),signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
@@ -50,6 +51,7 @@ function update(){
 }
 async function dispatch(message){
   const {method,args=[]}=message;
+  if(method==='soloFault')return readSoloFault(emulator?.module.HEAPU8);
   if(method==='init'){
     const setup=args[0];game=setup.game;patch=setup.patch;
     environment=workerEnvironment(setup.canvas,setup.sampleRate);
@@ -108,7 +110,7 @@ onmessage=({data})=>{queue=queue.then(async()=>{
   try{
     const result=await dispatch(data);
     if(data.id){const transfer=Array.isArray(result)?result.map(channel=>channel.buffer):result instanceof Uint8Array?[result.buffer]:[];postMessage({type:'reply',id:data.id,result},transfer);}
-  }catch(error){postMessage({type:'error',id:data.id,message:error?.stack||String(error)});}
+  }catch(error){postMessage({type:'error',id:data.id,message:error?.stack||String(error),diagnostics:readSoloFault(emulator?.module.HEAPU8)});}
 });};
-addEventListener('error',event=>postMessage({type:'error',message:event.message}));
-addEventListener('unhandledrejection',event=>postMessage({type:'error',message:String(event.reason?.stack||event.reason)}));
+addEventListener('error',event=>postMessage({type:'error',message:event.message,diagnostics:readSoloFault(emulator?.module.HEAPU8)}));
+addEventListener('unhandledrejection',event=>postMessage({type:'error',message:String(event.reason?.stack||event.reason),diagnostics:readSoloFault(emulator?.module.HEAPU8)}));
