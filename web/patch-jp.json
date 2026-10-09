@@ -4,10 +4,10 @@
   "patched_size": 168546,
   "insert_image_offset": 78048,
   "insert_size": 12288,
-  "payload_size": 12278,
+  "payload_size": 12288,
   "heap_bytes": 381440,
   "payload_and_heap_bytes": 393728,
-  "payload_padding_bytes": 10,
+  "payload_padding_bytes": 0,
   "entries": [
     34446,
     34829,
@@ -357,40 +357,40 @@
       "image_offset": 50622,
       "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
       "target_cs_offset": 46039,
-      "name": "16x16 even four-row blit"
+      "name": "16x16 even four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50726,
       "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
-      "target_cs_offset": 46164,
-      "name": "16x16 odd four-row blit"
+      "target_cs_offset": 46169,
+      "name": "16x16 odd four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50306,
       "original": "e8550075fb",
-      "target_cs_offset": 46289,
+      "target_cs_offset": 46299,
       "name": "32x32 even inline cloud rows"
     },
     {
       "image_offset": 50352,
       "original": "e8590075fb",
-      "target_cs_offset": 46342,
+      "target_cs_offset": 46352,
       "name": "32x32 odd inline cloud rows"
     },
     {
       "image_offset": 49728,
       "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
-      "target_cs_offset": 46404,
+      "target_cs_offset": 46414,
       "name": "spark four-row blit"
     },
     {
       "image_offset": 51691,
       "original": "a583c74ee2fa",
-      "target_cs_offset": 46522,
+      "target_cs_offset": 46532,
       "name": "point-bullet full six-row blit"
     }
   ],
-  "sha256": "a9c3b63f3d8d7903167665604d4d4245994738355b5a94c1726f047c525d847e",
+  "sha256": "10fbd95f89ddf82e49abfbe39568727d2ab199e6d92d98db17e4e06aa84231ae",
   "source": {
     "language": "ja",
     "file": "4-jp.hdi.gz",

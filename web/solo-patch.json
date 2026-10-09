@@ -2,12 +2,12 @@
   "version": 1,
   "original_md5": "e2b685961daaa8b668b3914461fbdb8a",
   "original_size": 156258,
-  "patched_size": 157826,
-  "sha256": "645d5c4b6dbcb486233a359a78b7ea0b473b37063185da4a9f5530195b647ff2",
+  "patched_size": 157842,
+  "sha256": "125f29b638ba7011dd347f6d51a24e4b7c7d468d1bfe23711edec2a7bd312686",
   "insert_image_offset": 78048,
-  "insert_size": 1568,
+  "insert_size": 1584,
   "code_segment": 2735,
-  "data_segment": 8598,
+  "data_segment": 8599,
   "mailbox_cs_offset": 34306,
   "signature": "TH04SOLOINPUTv1!",
   "entries": [
@@ -84,41 +84,41 @@
       "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
       "replacement": "e92a6f90909090909090909090909090909090909090909090",
       "target_cs_offset": 35323,
-      "name": "16x16 even four-row blit"
+      "name": "16x16 even four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50726,
       "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
-      "replacement": "e93f6f90909090909090909090909090909090909090909090",
-      "target_cs_offset": 35448,
-      "name": "16x16 odd four-row blit"
+      "replacement": "e9446f90909090909090909090909090909090909090909090",
+      "target_cs_offset": 35453,
+      "name": "16x16 odd four-row blit; equivalent SHRD rotation"
     },
     {
       "image_offset": 50306,
       "original": "e8550075fb",
-      "replacement": "e960719090",
-      "target_cs_offset": 35573,
+      "replacement": "e96a719090",
+      "target_cs_offset": 35583,
       "name": "32x32 even inline cloud rows"
     },
     {
       "image_offset": 50352,
       "original": "e8590075fb",
-      "replacement": "e967719090",
-      "target_cs_offset": 35626,
+      "replacement": "e971719090",
+      "target_cs_offset": 35636,
       "name": "32x32 odd inline cloud rows"
     },
     {
       "image_offset": 49728,
       "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
-      "replacement": "e9157490909090909090909090909090909090909090",
-      "target_cs_offset": 35688,
+      "replacement": "e91f7490909090909090909090909090909090909090",
+      "target_cs_offset": 35698,
       "name": "spark four-row blit"
     },
     {
       "image_offset": 51691,
       "original": "a583c74ee2fa",
-      "replacement": "e9e06c909090",
-      "target_cs_offset": 35806,
+      "replacement": "e9ea6c909090",
+      "target_cs_offset": 35816,
       "name": "point-bullet full six-row blit"
     }
   ],
@@ -151,7 +151,7 @@
     "main_md5": "e2b685961daaa8b668b3914461fbdb8a"
   },
   "disk": {
-    "sha256": "de7b47f7d2598c06f0f9c4db4dda4943d29f2fcccaa3a29c40d109af234763e5",
+    "sha256": "cc7e3460cdb012168c7d679e2be14c361603848a3d9b7c4a8944f79abe9adc04",
     "size": 21415936
   },
   "unchanged_files": {

@@ -29,7 +29,7 @@
   "controls_sha256": "3e3b43bb22961e9dbdba88dd00d3869a594dd5645e4160d84b0d190b0fb63955",
   "pause_sha256": "92977ae14ace41e7d47a27a565cd9786fa71b236e97fe510b33bd7ae1a44ccb3",
   "native_sound": {
-    "disk_sha256": "11eb3eac378439210c0c4f3a4e5908881b97a74cd96f894c450f94c75b7326f8",
+    "disk_sha256": "a458675b8229ebd60feddb2e3b5d25b88c60d79241cf13806648dfbbb03f1008",
     "bgm": 0,
     "se": 1,
     "schema": 2,
@@ -139,7 +139,7 @@
   },
   "native_sound_by_language": {
     "cn": {
-      "disk_sha256": "11eb3eac378439210c0c4f3a4e5908881b97a74cd96f894c450f94c75b7326f8",
+      "disk_sha256": "a458675b8229ebd60feddb2e3b5d25b88c60d79241cf13806648dfbbb03f1008",
       "bgm": 0,
       "se": 1,
       "schema": 2,
@@ -248,7 +248,7 @@
       }
     },
     "jp": {
-      "disk_sha256": "ee9a1eb1bf8cdf9d8dc9d487be52c2b270f0319f43e6d369b712b81cfb526db8",
+      "disk_sha256": "9dc96ede4dfeaa1b8097006544bfed62b9414a77cb2796c9800b1b697e69caab",
       "bgm": 0,
       "se": 1,
       "schema": 2,
