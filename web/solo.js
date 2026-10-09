@@ -3,6 +3,7 @@ import {mountSoloView} from './solo-view.js';
 import {SoloMusic} from './solo-music.js';
 import {startFrameLoop} from './frame-limit.js';
 import {mountSoloPerformance} from './solo-performance.js';
+import {mountSoloTestTools,readSoloDiagnostics,writeSoloTestCommand} from './solo-test-tools.js';
 import {gameVersion,rememberLanguage} from './game-version.js';
 // Standalone original game. No cooperative runtime, launcher or netplay session.
 import {NP21} from './vendor/np2/np2-wasm.js';
@@ -27,10 +28,20 @@ const signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
 const player=mountPlayer($('game'),{solo:true,onGesture:async()=>{soloMusic?.resume();await emulator?.module.SDL2?.audioContext?.resume();}});
 mountSoloView($('game'));
 mountSoloPerformance({host:$('game'),game:'04',getEmulator:()=>emulator,readState:()=>{
-  const s=readSoloState();return s?{playing:s.mode===1&&!s.flags,generation:s.generation,ticks:s.ticks}:null;
+  const s=readSoloState();return s?{...s,playing:s.mode===1&&!s.flags}:null;
+}});
+const testTools=mountSoloTestTools({host:$('game'),readState:readSoloState,command:async value=>{
+  const state=readSoloState();if(!state)throw Error('请先进入单机关卡。');
+  const command={...value,generation:state.generation};
+  if(emulator.isWorker)await emulator.call('soloTest',[command]);
+  else writeSoloTestCommand(emulator.module.HEAPU8,mailbox,patch,command);
 }});
 const screen=document.createElement('div');screen.className='screen solo-screen';
 const canvas=document.createElement('canvas');canvas.id='canvas';canvas.width=640;canvas.height=400;canvas.tabIndex=0;screen.append(canvas);player.stage.append(screen);
+// Return keyboard control after using the solo test/settings panel.
+$('game').addEventListener('click',event=>{
+  if(event.target.closest('[data-close],[data-save]')&&$('game').querySelector('.touch-layout-editor').hidden)canvas.focus();
+});
 const focus=mountFocusSettings($('control-settings'),{alwaysPointControl:player.alwaysPointControl,profile:'solo'});
 const editor=mountControlSettings($('control-settings'),{solo:true,onEditing:()=>release(),onChange:()=>{release();summary();}});
 function summary(){$('controls-summary').textContent=controlsSummary('solo');}summary();
@@ -65,7 +76,7 @@ function scan(now){
     const slice=h.subarray(scanCursor,Math.min(end+35,h.length));
     for(let offset=slice.indexOf(signature[0]);offset>=0&&scanCursor+offset<end;offset=slice.indexOf(signature[0],offset+1)){
       const at=scanCursor+offset;
-      if(at+36>h.length||!signature.every((v,i)=>h[at+i]===v))continue;
+      if(at+(patch.mailbox_size||36)>h.length||!signature.every((v,i)=>h[at+i]===v))continue;
       if(view.getUint32(at+16,true)&&view.getUint16(at+20,true)&&!seen.has(at))seen.set(at,{ticks:0,changed:-Infinity});
     }
     scanCursor=end;
@@ -74,6 +85,7 @@ function scan(now){
   return mailbox<0?null:{mode:h[mailbox+22],flags:h[mailbox+23],generation:view.getUint16(mailbox+24,true)};
 }
 function tick(now){
+  testTools.update(now);
   if(emulator?.state==='running'){
     if(!emulator.isWorker)soloMusic?.poll(emulator.module.HEAPU8,now);
     const state=scan(now),game=state?.mode===1;
@@ -154,5 +166,6 @@ export function readSoloState(){
   return {mode:h[mailbox+22],flags:h[mailbox+23],ticks:v.getUint32(mailbox+16,true),
     generation:v.getUint16(mailbox+24,true),pointOptions:h[mailbox+26],
     x:v.getInt16(data+0x464e,true)/16,y:v.getInt16(data+0x4650,true)/16,
-    stage:h[data+0x5394],focus:h[data+0x3976],touchFlags:v.getUint16(mailbox+28,true)};
+    stage:h[data+0x5394],focus:h[data+0x3976],touchFlags:v.getUint16(mailbox+28,true),
+    ...readSoloDiagnostics(h,mailbox,patch)};
 }

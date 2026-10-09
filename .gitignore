@@ -43,6 +43,16 @@
 /web/tools/
 /web/vendor-source/
 
+# Browser test artifacts and instrumented emulator binaries are local-only.
+# solo-test-tools.js and solo-performance.js are shipped player features.
+/web/**/test-results/
+/web/**/playwright-report/
+/web/**/guest-*.wasm
+/web/**/extra-probe.wasm
+/web/**/extra-raw.wasm
+/web/**/*.wat
+/web/**/*.lst
+
 # Retired assets are not used by the current game.
 /web/local-music-disk.json
 /web/local-music-patch.json

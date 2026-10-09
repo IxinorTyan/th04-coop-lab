@@ -26,7 +26,9 @@ export function mountSoloPerformance({host,game,getEmulator,readState}){
     const now=performance.now(),elapsed=now-run.start,final=readState(),config=run.emulator.config;
     const native=summarize(run.costs),raf=summarize(run.intervals);
     const stable=run.stable&&final?.playing&&final.generation===run.state?.generation&&final.ticks>=run.state?.ticks;
-    report={schema:'touhou-solo-performance/1',build:'20261008-dispatch-cache',game,recordedAt:new Date().toISOString(),
+    const gameFrames=stable&&final.totalFrames!=null?final.totalFrames-run.state.totalFrames:null;
+    const slowFrames=stable&&final.slowFrames!=null?final.slowFrames-run.state.slowFrames:null;
+    report={schema:'touhou-solo-performance/2',build:'20261009-solo-test-tools',game,recordedAt:new Date().toISOString(),
       completion:reason,durationMs:elapsed,environment:{userAgent:navigator.userAgent,
         hardwareConcurrency:navigator.hardwareConcurrency||null,deviceMemoryGiB:navigator.deviceMemory||null,
         devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},screen:{width:screen.width,height:screen.height},
@@ -38,15 +40,19 @@ export function mountSoloPerformance({host,game,getEmulator,readState}){
         busyPercent:run.costs.reduce((a,b)=>a+b,0)*100/elapsed},
       animationFrames:{...raf,hz:run.intervals.length?run.intervals.length*1000/run.intervals.reduce((a,b)=>a+b,0):null},
       game:{start:run.state,end:final,continuousBattle:!!stable,
-        ticksHz:stable?(final.ticks-run.state.ticks)*1000/elapsed:null},
+        ticksHz:stable?(final.ticks-run.state.ticks)*1000/elapsed:null,
+        nativeFrames:gameFrames,nativeSlowFrames:slowFrames,
+        nativeSlowPercent:gameFrames>0&&slowFrames>=0?slowFrames*100/gameFrames:null},
       notes:['Native callbacks may batch multiple emulated frames; callback Hz is not game FPS.',
         'Busy percent covers the emulator callback, excluding separate audio callbacks and other page work.',
-        'Game tick rate is only reported for an observed continuous battle; original PC-98 timing is not exactly 60 Hz.']};
+        'Game tick rate is only reported for an observed continuous battle; original PC-98 timing is not exactly 60 Hz.',
+        'Native slow frames are the original game counter relative to emulated VSync, not a browser frame-drop counter.']};
     record.disabled=false;record.textContent='再记录 15 秒';download.hidden=false;
     show(`${reason==='complete'?'记录完成':'记录已中止'} · ${round(elapsed/1000)} 秒\n`
       +`模拟器回调：${round(report.nativeCallbacks.hz)} 次/秒，平均 ${round(native.meanMs)} ms，P95 ${round(native.p95Ms)} ms\n`
       +`回调占用：${round(report.nativeCallbacks.busyPercent)}%；超过 50 ms：${native.over50ms} 次\n`
       +`游戏推进：${round(report.game.ticksHz)} 步/秒${stable?'':'（请在实际战斗中记录，并避免暂停或切换关卡）'}\n`
+      +(report.game.nativeSlowPercent==null?'':`原作内部超时帧：${round(report.game.nativeSlowPercent)}% · ${final.turbo?'Turbo':'Slow'} · 难度 ${['Easy','Normal','Hard','Lunatic','Extra'][final.rank]||'未知'}\n`)
       +'可下载报告进行对比。报告只保存在本页，不会自动上传。');
   }
   record.onclick=()=>{

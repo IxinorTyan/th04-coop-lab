@@ -2,65 +2,148 @@
   "version": 1,
   "original_md5": "e2b685961daaa8b668b3914461fbdb8a",
   "original_size": 156258,
-  "patched_size": 156962,
-  "sha256": "b536723fb453530f4c31c0e814ffa582210ff9cf1853f8d688d01db832b583c6",
+  "patched_size": 157826,
+  "sha256": "645d5c4b6dbcb486233a359a78b7ea0b473b37063185da4a9f5530195b647ff2",
   "insert_image_offset": 78048,
-  "insert_size": 704,
+  "insert_size": 1568,
   "code_segment": 2735,
-  "data_segment": 8544,
-  "mailbox_cs_offset": 34302,
+  "data_segment": 8598,
+  "mailbox_cs_offset": 34306,
   "signature": "TH04SOLOINPUTv1!",
   "entries": [
-    34427,
-    34450,
-    34506,
-    34688,
-    34465,
-    34491,
-    34302
+    34435,
+    34458,
+    34716,
+    34898,
+    34511,
+    34537,
+    34306,
+    34573,
+    34688
   ],
   "hooks": [
     {
       "image_offset": 44918,
       "original": "e85702",
-      "target_cs_offset": 34427,
+      "target_cs_offset": 34435,
       "name": "stage init/status"
     },
     {
       "image_offset": 44001,
       "original": "e8db5e",
-      "target_cs_offset": 34450,
+      "target_cs_offset": 34458,
       "name": "player status"
     },
     {
       "image_offset": 44056,
       "original": "e8e25f",
-      "target_cs_offset": 34506,
+      "target_cs_offset": 34716,
       "name": "optional collision point"
     },
     {
       "image_offset": 68469,
       "original": "e8d8fd",
-      "target_cs_offset": 34688,
+      "target_cs_offset": 34898,
       "name": "touch velocity"
     },
     {
       "image_offset": 43950,
       "original": "e81e07",
-      "target_cs_offset": 34465,
+      "target_cs_offset": 34511,
       "name": "original pause/status"
     },
     {
       "image_offset": 43886,
       "original": "e81700",
-      "target_cs_offset": 34491,
+      "target_cs_offset": 34537,
       "name": "world exit/status"
+    },
+    {
+      "image_offset": 44276,
+      "original": "e8cd69",
+      "target_cs_offset": 34573,
+      "name": "solo test command at frame boundary"
+    },
+    {
+      "image_offset": 44779,
+      "original": "803e945300",
+      "target_cs_offset": 34688,
+      "name": "avoid duplicate run assets on stage-one test reload"
     }
   ],
+  "performance_hooks": [
+    {
+      "image_offset": 48081,
+      "original": "b90800268b0426890583c65083c750e2f281ef8002",
+      "replacement": "e9ad78909090909090909090909090909090909090",
+      "target_cs_offset": 35217,
+      "name": "fixed eight-row EGC tile copy; original read/write order"
+    },
+    {
+      "image_offset": 50622,
+      "original": "add3c88af022c226890532c674042688450283c750fecd75e7",
+      "replacement": "e92a6f90909090909090909090909090909090909090909090",
+      "target_cs_offset": 35323,
+      "name": "16x16 even four-row blit"
+    },
+    {
+      "image_offset": 50726,
+      "original": "add3c88af022c226880532c686e02689450183c750fecd75e7",
+      "replacement": "e93f6f90909090909090909090909090909090909090909090",
+      "target_cs_offset": 35448,
+      "name": "16x16 odd four-row blit"
+    },
+    {
+      "image_offset": 50306,
+      "original": "e8550075fb",
+      "replacement": "e960719090",
+      "target_cs_offset": 35573,
+      "name": "32x32 even inline cloud rows"
+    },
+    {
+      "image_offset": 50352,
+      "original": "e8590075fb",
+      "replacement": "e967719090",
+      "target_cs_offset": 35626,
+      "name": "32x32 odd inline cloud rows"
+    },
+    {
+      "image_offset": 49728,
+      "original": "ad0ae47405268905eb070ac0740326880583c750e2ea",
+      "replacement": "e9157490909090909090909090909090909090909090",
+      "target_cs_offset": 35688,
+      "name": "spark four-row blit"
+    },
+    {
+      "image_offset": 51691,
+      "original": "a583c74ee2fa",
+      "replacement": "e9e06c909090",
+      "target_cs_offset": 35806,
+      "name": "point-bullet full six-row blit"
+    }
+  ],
+  "near_code_guard": {
+    "image_offset": 78048,
+    "original": "8346fe1a83fe107cdb5f5ec9c3"
+  },
   "heap_bytes": 320000,
   "changed_files": [
     "GENSO/MAIN.EXE"
   ],
+  "mailbox_size": 40,
+  "test_tools": {
+    "options": 36,
+    "stage_request": 37,
+    "result": 38,
+    "used": 39
+  },
+  "diagnostics": {
+    "turbo": 21408,
+    "rank": 17224,
+    "stage_frame": 21386,
+    "slow_frames": 6240,
+    "total_frames": 6244
+  },
   "source": {
     "language": "zh-CN",
     "file": "4-cn.hdi.gz",
@@ -68,7 +151,7 @@
     "main_md5": "e2b685961daaa8b668b3914461fbdb8a"
   },
   "disk": {
-    "sha256": "fa323948933355ad6792a3ef578da5f6ee927d87df990c808e8d7c10e2c4e0f9",
+    "sha256": "de7b47f7d2598c06f0f9c4db4dda4943d29f2fcccaa3a29c40d109af234763e5",
     "size": 21415936
   },
   "unchanged_files": {

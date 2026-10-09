@@ -1,4 +1,5 @@
 import {workerEnvironment} from './solo-worker-environment.js';
+import {readSoloDiagnostics,writeSoloTestCommand} from './solo-test-tools.js';
 
 let emulator,environment,bridge,music,game,patch,mailbox=-1,cursor=0;
 const seen=new Map(),signature=new TextEncoder().encode('TH04SOLOINPUTv1!');
@@ -17,14 +18,15 @@ function scan04(now){
     const end=Math.min(cursor+1024*1024,h.length),slice=h.subarray(cursor,Math.min(end+35,h.length));
     for(let i=slice.indexOf(signature[0]);i>=0&&cursor+i<end;i=slice.indexOf(signature[0],i+1)){
       const at=cursor+i;
-      if(at+36<=h.length&&signature.every((b,j)=>h[at+j]===b)&&v.getUint32(at+16,true)&&v.getUint16(at+20,true)&&!seen.has(at))seen.set(at,{ticks:0,changed:-Infinity});
+      if(at+(patch.mailbox_size||36)<=h.length&&signature.every((b,j)=>h[at+j]===b)&&v.getUint32(at+16,true)&&v.getUint16(at+20,true)&&!seen.has(at))seen.set(at,{ticks:0,changed:-Infinity});
     }
     cursor=end;
   }
   if(mailbox<0)return null;
   const at=mailbox,data=at-patch.mailbox_cs_offset+(patch.data_segment-patch.code_segment)*16;
   return {at,mode:h[at+22],flags:h[at+23],generation:v.getUint16(at+24,true),ticks:v.getUint32(at+16,true),pointOptions:h[at+26],
-    x:v.getInt16(data+0x464e,true)/16,y:v.getInt16(data+0x4650,true)/16,stage:h[data+0x5394],focus:h[data+0x3976],touchFlags:v.getUint16(at+28,true)};
+    x:v.getInt16(data+0x464e,true)/16,y:v.getInt16(data+0x4650,true)/16,stage:h[data+0x5394],focus:h[data+0x3976],touchFlags:v.getUint16(at+28,true),
+    ...readSoloDiagnostics(h,at,patch)};
 }
 function clear(){
   for(const event of held.values())environment.key({...event,type:'keyup'});
@@ -88,6 +90,10 @@ async function dispatch(message){
     return;
   }
   if(method==='clear'){clear();return;}
+  if(method==='soloTest'){
+    if(game!=='04')throw Error('测试工具仅用于 TH04 独立单机。');
+    writeSoloTestCommand(emulator.module.HEAPU8,mailbox,patch,args[0]);return;
+  }
   if(method==='pause'){clear();emulator.pause();return;}
   if(method==='reset'){pendingMusic=[];clear();bridge?.reset();music?.reset();seen.clear();mailbox=-1;cursor=0;emulator.reset();return;}
   if(method==='run'){lastInput=performance.now();emulator.run();return;}
